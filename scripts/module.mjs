@@ -7,7 +7,7 @@
  *  setup: ruledata load (fetch), public API.
  *  ready: system check, GM time watcher, chat commands, card listeners.
  */
-import { MODULE_ID, LOCATION_TYPE, RULEDATA, HOOKS } from "./constants.mjs";
+import { MODULE_ID, LOCATION_TYPE, RULEDATA, HOOKS, SCHEMA_VERSION } from "./constants.mjs";
 import * as config from "./config.mjs";
 import { registerSettings, getSetting } from "./settings.mjs";
 import { initTables, getTable, getDoc } from "./rules/tables.mjs";
@@ -26,6 +26,7 @@ import { openRecruitDialog } from "./apps/recruit-dialog.mjs";
 import { createPosting, processLocation, processAllLocations, effectiveMarketClass } from "./engine/recruitment.mjs";
 import { hire, checkHenchmanLimit } from "./engine/hire.mjs";
 import * as candidateRules from "./rules/candidates.mjs";
+import * as identityRules from "./rules/identity.mjs";
 import { onTimeAdvanced, advanceDays, now } from "./time.mjs";
 import { bindCardListeners, registerCardAction } from "./chat/cards.mjs";
 import { registerSockets, executeAsGM, registerSocketAction } from "./sockets.mjs";
@@ -114,7 +115,7 @@ Hooks.once("setup", async () => {
     HenchmanRecord,
     getRecord: (actor) => HenchmanRecord.fromActor(actor),
     // rules (pure; slavery rules only function with enableSlavery on)
-    rules: { ...availabilityRules, ...wageRules, ...loyaltyRules, ...diceRules, ...candidateRules, slavery: slaveryRules },
+    rules: { ...availabilityRules, ...wageRules, ...loyaltyRules, ...diceRules, ...candidateRules, ...identityRules, slavery: slaveryRules },
     tables: { getTable, getDoc },
     // adapter + effects (the data-driven modifier contract)
     adapter,
@@ -135,6 +136,29 @@ Hooks.once("ready", () => {
   registerSockets();
   registerEventEngine();
   registerInfluenceIntegration();
+
+  // Location schema migration (GM): v2 moved availability from per-posting
+  // pools to the location's shared market — old-shape postings/candidates
+  // (pre-0.3.0 test data) cannot be converted and are cleared.
+  if (game.user === game.users.activeGM) {
+    for (const location of game.actors.filter((a) => a.type === LOCATION_TYPE)) {
+      if ((location.system.schemaVersion ?? 1) >= SCHEMA_VERSION) continue;
+      const hadData = (location.system.postings?.length ?? 0) + (location.system.candidates?.length ?? 0) > 0;
+      location
+        .update({
+          "system.postings": [],
+          "system.candidates": [],
+          "system.marketRolls": [],
+          "system.schemaVersion": SCHEMA_VERSION,
+        })
+        .then(() => {
+          if (hadData) {
+            ui.notifications.warn(game.i18n.format("ACKS-HENCHMEN.migration.wiped", { name: location.name }));
+          }
+        })
+        .catch((err) => console.error(`${MODULE_ID} | migration failed for ${location.name}`, err));
+    }
+  }
 
   // GM-side due-processing whenever world time moves (posting aging, arrival
   // tranches, weekly fees, month rollover). Idempotent per posting.

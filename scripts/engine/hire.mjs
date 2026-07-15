@@ -119,7 +119,11 @@ export async function hire(location, candidateId, employer, opts = {}) {
         category,
         quantity: candidate.quantity ?? 1,
       },
-      details: { level: candidate.level ?? 0 },
+      details: {
+        level: candidate.level ?? 0,
+        age: candidate.age ?? undefined,
+        class: candidate.classKey || candidate.occupation || "",
+      },
     },
   };
   if (candidate.attributes?.str != null) {
@@ -148,6 +152,13 @@ export async function hire(location, candidateId, employer, opts = {}) {
     settlementName: location.name,
     employerUuid: employer.uuid,
     hiredTime: now(),
+    identity: {
+      gender: candidate.gender ?? "",
+      culture: candidate.culture ?? "",
+      age: candidate.age ?? null,
+      occupation: candidate.occupation ?? "",
+      appearance: candidate.appearance ?? "",
+    },
     rolled: {
       attributes: candidate.attributes ?? {},
       classKey: candidate.classKey ?? "",

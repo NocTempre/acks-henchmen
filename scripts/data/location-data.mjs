@@ -21,12 +21,19 @@ const int = (initial = 0, opts = {}) =>
   new fields.NumberField({ required: true, nullable: false, integer: true, initial, ...opts });
 const str = (opts = {}) => new fields.StringField({ required: false, blank: true, initial: "", ...opts });
 
-/** One recruitment posting (a paid, ongoing search for one hireling spec). */
+/**
+ * One recruitment posting — a recruiter's PAID SEARCH (fee per week per
+ * hireling type, RR 162). Generic searches (by level / troop / specialist)
+ * grant access to the LOCATION's shared monthly pool for that segment;
+ * specific searches (by class / proficiency, JJ 118) are rolled separately
+ * and privately for the paying recruiter.
+ */
 function postingField() {
   return new fields.SchemaField({
     id: str(),
     createdTime: int(),
-    monthStartTime: int(), // start of the current availability month
+    monthStartTime: int(), // start of the current availability month (private searches)
+    segment: str(), // shared-pool key for generic searches, e.g. "henchman:1"
     employerUuid: str(),
     dedicatedSearcherUuid: str(), // occupies one ancillary activity per day (informational)
     spec: new fields.SchemaField({
@@ -64,14 +71,25 @@ function postingField() {
   });
 }
 
-/** One candidate rolled up by a posting (plain record until hired). */
+/**
+ * One candidate — a UNIQUE INDIVIDUAL in the market (name, age, culture,
+ * appearance, occupation generated from the location's demographics). Only
+ * troop-scale entries (mercenaries, mass laborers) stay aggregated with a
+ * quantity; the pool total is bookkeeping, the people are individuals.
+ */
 function candidateField() {
   return new fields.SchemaField({
     id: str(),
-    postingId: str(),
+    segment: str(), // shared-pool key ("" for private specific searches)
+    privateToUuid: str(), // employer uuid for JJ specific searches ("" = public)
     name: str(),
+    gender: str(),
+    culture: str(),
+    age: num({ integer: true }),
+    occupation: str(),
+    appearance: str(),
     kind: new fields.StringField({ required: true, initial: "henchman" }),
-    quantity: int(1), // aggregated rows for masses (0th-level, mercs, laborers)
+    quantity: int(1), // >1 only for aggregated troop-scale rows
     level: num({ integer: true }),
     classKey: str(),
     classRarity: str(),
@@ -145,6 +163,26 @@ export class LocationData extends foundry.abstract.TypeDataModel {
         initial: "composite",
         choices: ["composite", "longbow"],
       }),
+      // Demographics: weighted culture mix driving candidate identity
+      // generation (RR 495-503). Empty = uniform random across all cultures.
+      demographics: new fields.ArrayField(
+        new fields.SchemaField({
+          culture: str(),
+          weight: int(1),
+        })
+      ),
+      // The LOCATION's monthly availability ledger: one entry per generic
+      // segment rolled this month (availability is a property of the market,
+      // RR 162 — shared by all recruiters; rolled once per month per type).
+      marketRolls: new fields.ArrayField(
+        new fields.SchemaField({
+          segment: str(),
+          monthStartTime: int(),
+          total: int(0),
+          detail: str(),
+        })
+      ),
+      schemaVersion: int(1),
       postings: new fields.ArrayField(postingField()),
       candidates: new fields.ArrayField(candidateField()),
       slander: new fields.ArrayField(

@@ -19,7 +19,8 @@
     </div>
   </header>
 
-  <details class="section" open>
+  {{#if isGM}}
+  <details class="section">
     <summary>{{localize "ACKS-HENCHMEN.location.settings"}}</summary>
     <div class="grid-2">
       <div class="form-group">
@@ -55,23 +56,70 @@
         <input type="checkbox" name="system.desertRealm" {{#if system.desertRealm}}checked{{/if}} />
       </div>
     </div>
+    <div class="demographics-block">
+      <label class="block-label" data-tooltip="{{localize 'ACKS-HENCHMEN.location.demographicsHint'}}">
+        {{localize "ACKS-HENCHMEN.location.demographics"}}
+        <a class="inline-add" data-action="addDemographic"><i class="fas fa-plus"></i></a>
+      </label>
+      {{#each demographics}}
+      <div class="demographic-row" data-demographic-index="{{index}}">
+        <select name="system.demographics.{{index}}.culture">
+          {{#each @root.cultureOptions}}
+          <option value="{{id}}" {{#if (eq id ../culture)}}selected{{/if}}>{{label}}</option>
+          {{/each}}
+        </select>
+        <input type="number" name="system.demographics.{{index}}.weight" value="{{weight}}" min="0" step="1" data-tooltip="{{localize 'ACKS-HENCHMEN.location.weight'}}" />
+        <a data-action="removeDemographic"><i class="fas fa-trash"></i></a>
+      </div>
+      {{else}}
+      <p class="hint">{{localize "ACKS-HENCHMEN.location.demographicsEmpty"}}</p>
+      {{/each}}
+    </div>
+  </details>
+  {{/if}}
+
+  <details class="section" open>
+    <summary>{{localize "ACKS-HENCHMEN.market.header"}} ({{market.length}})</summary>
+    <p class="hint">{{localize "ACKS-HENCHMEN.market.hint"}}</p>
+    {{#if market.length}}
+    <table class="market-table">
+      <thead>
+        <tr>
+          <th>{{localize "ACKS-HENCHMEN.market.segment"}}</th>
+          <th data-tooltip="{{localize 'ACKS-HENCHMEN.posting.weekHint'}}">{{localize "ACKS-HENCHMEN.posting.week"}}</th>
+          <th data-tooltip="{{localize 'ACKS-HENCHMEN.posting.poolHint'}}">{{localize "ACKS-HENCHMEN.posting.pool"}}</th>
+          <th>{{localize "ACKS-HENCHMEN.market.arrived"}}</th>
+          <th>{{localize "ACKS-HENCHMEN.market.hired"}}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#each market}}
+        <tr>
+          <td data-tooltip="{{detail}}">{{label}}</td>
+          <td>{{week}}</td>
+          <td>{{total}}</td>
+          <td>{{arrived}}{{#if pending}} <span class="hint">(+{{pending}})</span>{{/if}}</td>
+          <td>{{hired}}</td>
+        </tr>
+        {{/each}}
+      </tbody>
+    </table>
+    {{else}}
+    <p class="hint">{{localize "ACKS-HENCHMEN.market.empty"}}</p>
+    {{/if}}
   </details>
 
   <details class="section" open>
     <summary>
       {{localize "ACKS-HENCHMEN.location.postings"}} ({{postings.length}})
-      {{#if isGM}}
       <button type="button" class="inline-add" data-action="createPosting"><i class="fas fa-plus"></i> {{localize "ACKS-HENCHMEN.posting.create"}}</button>
-      {{/if}}
     </summary>
     {{#if postings.length}}
     <table class="postings-table">
       <thead>
         <tr>
           <th>{{localize "ACKS-HENCHMEN.posting.spec"}}</th>
-          <th data-tooltip="{{localize 'ACKS-HENCHMEN.posting.weekHint'}}">{{localize "ACKS-HENCHMEN.posting.week"}}</th>
-          <th data-tooltip="{{localize 'ACKS-HENCHMEN.posting.poolHint'}}">{{localize "ACKS-HENCHMEN.posting.pool"}}</th>
-          <th>{{localize "ACKS-HENCHMEN.posting.available"}}</th>
+          <th>{{localize "ACKS-HENCHMEN.posting.employer"}}</th>
           <th>{{localize "ACKS-HENCHMEN.posting.fees"}}</th>
           <th>{{localize "ACKS-HENCHMEN.posting.statusHeader"}}</th>
           {{#if isGM}}<th></th>{{/if}}
@@ -80,17 +128,14 @@
       <tbody>
         {{#each postings}}
         <tr data-posting-id="{{id}}" class="{{#unless isActive}}inactive{{/unless}}">
-          <td data-tooltip="{{rollDetail}}">{{specLabel}}{{#if commissioned}} <i class="fas fa-scroll" data-tooltip="{{localize 'ACKS-HENCHMEN.posting.commissioned'}}"></i>{{/if}}</td>
-          <td>{{week}}</td>
-          <td>{{totalAvailable}}</td>
-          <td>{{availableCount}}{{#if pendingCount}} <span class="hint">(+{{pendingCount}})</span>{{/if}}</td>
+          <td data-tooltip="{{rollDetail}}">{{specLabel}}{{#if isPrivate}} <i class="fas fa-user-lock" data-tooltip="{{localize 'ACKS-HENCHMEN.posting.privateHint'}}"></i>{{/if}}{{#if commissioned}} <i class="fas fa-scroll" data-tooltip="{{localize 'ACKS-HENCHMEN.posting.commissioned'}}"></i>{{/if}}</td>
+          <td>{{employerName}}</td>
           <td>{{feesTotal}} gp</td>
           <td>{{statusLabel}}</td>
           {{#if @root.isGM}}
           <td class="row-actions">
             <a data-action="togglePlayerDetails" data-tooltip="{{localize 'ACKS-HENCHMEN.posting.toggleDetails'}}"><i class="fas {{#if playersSeeDetails}}fa-eye{{else}}fa-eye-slash{{/if}}"></i></a>
             {{#if isActive}}
-            <a data-action="renewPosting" data-tooltip="{{localize 'ACKS-HENCHMEN.posting.renew'}}"><i class="fas fa-repeat"></i></a>
             <a data-action="closePosting" data-tooltip="{{localize 'ACKS-HENCHMEN.posting.close'}}"><i class="fas fa-xmark"></i></a>
             {{/if}}
           </td>
@@ -111,9 +156,9 @@
       <thead>
         <tr>
           <th>{{localize "ACKS-HENCHMEN.candidate.name"}}</th>
-          <th>{{localize "ACKS-HENCHMEN.candidate.qty"}}</th>
-          <th>{{localize "ACKS-HENCHMEN.candidate.levelClass"}}</th>
-          <th>{{localize "ACKS-HENCHMEN.candidate.stats"}}</th>
+          <th>{{localize "ACKS-HENCHMEN.candidate.age"}}</th>
+          <th>{{localize "ACKS-HENCHMEN.candidate.culture"}}</th>
+          <th>{{localize "ACKS-HENCHMEN.candidate.identity"}}</th>
           <th>{{localize "ACKS-HENCHMEN.candidate.wage"}}</th>
           <th>{{localize "ACKS-HENCHMEN.candidate.statusHeader"}}</th>
           <th></th>
@@ -122,10 +167,10 @@
       <tbody>
         {{#each candidates}}
         <tr data-candidate-id="{{id}}" class="status-{{status}}">
-          <td>{{name}}</td>
-          <td>{{quantity}}</td>
-          <td>{{#if level}}L{{level}}{{/if}} {{classKey}}{{#if template}} ({{template}}){{/if}}</td>
-          <td>{{statLine}}</td>
+          <td data-tooltip="{{appearanceTip}}">{{name}}{{#if isAggregate}} ×{{quantity}}{{/if}}{{#if isPrivate}} <i class="fas fa-user-lock" data-tooltip="{{localize 'ACKS-HENCHMEN.posting.privateHint'}}"></i>{{/if}}</td>
+          <td>{{age}}</td>
+          <td>{{cultureLabel}}</td>
+          <td>{{identityLine}}</td>
           <td>{{#if wageGp}}{{wageGp}} gp/{{wageUnit}}{{/if}}</td>
           <td>{{statusLabel}}</td>
           <td class="row-actions">
@@ -145,10 +190,11 @@
     {{/if}}
   </details>
 
+  {{#if isGM}}
   <details class="section">
     <summary>
       {{localize "ACKS-HENCHMEN.location.slander"}} ({{slander.length}})
-      {{#if isGM}}<button type="button" class="inline-add" data-action="addSlander"><i class="fas fa-plus"></i></button>{{/if}}
+      <button type="button" class="inline-add" data-action="addSlander"><i class="fas fa-plus"></i></button>
     </summary>
     <p class="hint">{{localize "ACKS-HENCHMEN.location.slanderHint"}}</p>
     {{#each slander}}
@@ -156,7 +202,7 @@
       <input type="text" name="system.slander.{{index}}.partyKey" value="{{partyKey}}" placeholder="{{localize 'ACKS-HENCHMEN.location.slanderParty'}}" />
       <input type="text" name="system.slander.{{index}}.npcName" value="{{npcName}}" placeholder="{{localize 'ACKS-HENCHMEN.location.slanderNpc'}}" />
       <input type="text" name="system.slander.{{index}}.note" value="{{note}}" placeholder="{{localize 'ACKS-HENCHMEN.location.slanderNote'}}" />
-      {{#if @root.isGM}}<a data-action="removeSlander"><i class="fas fa-trash"></i></a>{{/if}}
+      <a data-action="removeSlander"><i class="fas fa-trash"></i></a>
     </div>
     {{/each}}
   </details>
@@ -176,4 +222,5 @@
     <summary>{{localize "ACKS-HENCHMEN.location.notesHeader"}}</summary>
     <textarea name="system.notes" rows="4">{{system.notes}}</textarea>
   </details>
+  {{/if}}
 </div>

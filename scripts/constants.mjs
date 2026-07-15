@@ -26,7 +26,11 @@ export const RULEDATA = Object.freeze([
   "settlement",
   "monsters",
   "slavery",
+  "people",
 ]);
+
+/** Current location-actor schema version (see migrations in module.mjs). */
+export const SCHEMA_VERSION = 2;
 
 /**
  * Active Effect change-key prefix. Any effect change whose key is

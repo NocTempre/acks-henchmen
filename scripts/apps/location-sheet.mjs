@@ -1,21 +1,19 @@
-/* global game, ui, foundry */
+/* global game, ui, foundry, fromUuidSync */
 /**
  * LocationSheet — ActorSheetV2 for the `acks-henchmen.location` sub-type.
- * GM view: market-class derivation, postings (monthly pool, arrivals, fees),
- * candidates, slander registry, and the search-fee ledger. Players with
- * OBSERVER permission get the same document rendered by PostingsApp (the
- * recruitment board) — this sheet is the management surface.
  *
- * Stacked collapsible sections instead of tab groups: identical markup works
- * on Foundry v13 and v14 without version-specific tab wiring.
+ * Sections: market settings + demographics, THE MARKET (the location's
+ * shared monthly pools — availability belongs to the town, RR 162), paid
+ * searches (postings), candidates (unique individuals), slander registry,
+ * fee ledger. Players with OBSERVER permission see the candidates their
+ * paid searches cover; GMs see everything.
  */
 import { MODULE_ID, SECONDS_PER_WEEK } from "../constants.mjs";
 import { getTable } from "../rules/tables.mjs";
-import { processLocation, effectiveMarketClass } from "../engine/recruitment.mjs";
+import { processLocation } from "../engine/recruitment.mjs";
 import { openPostingDialog } from "./posting-dialog.mjs";
 import { openRecruitDialog } from "./recruit-dialog.mjs";
-import { now } from "../time.mjs";
-import { advanceDays } from "../time.mjs";
+import { now, advanceDays } from "../time.mjs";
 
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 const { ActorSheetV2 } = foundry.applications.sheets;
@@ -23,7 +21,7 @@ const { ActorSheetV2 } = foundry.applications.sheets;
 export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
   static DEFAULT_OPTIONS = {
     classes: ["acks-henchmen", "location-sheet"],
-    position: { width: 720, height: 700 },
+    position: { width: 760, height: 720 },
     window: { resizable: true },
     form: { submitOnChange: true },
     actions: {
@@ -31,18 +29,39 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
       processNow: LocationSheet.#onProcessNow,
       advanceWeek: LocationSheet.#onAdvanceWeek,
       closePosting: LocationSheet.#onClosePosting,
-      renewPosting: LocationSheet.#onRenewPosting,
       togglePlayerDetails: LocationSheet.#onTogglePlayerDetails,
       recruit: LocationSheet.#onRecruit,
       removeCandidate: LocationSheet.#onRemoveCandidate,
       addSlander: LocationSheet.#onAddSlander,
       removeSlander: LocationSheet.#onRemoveSlander,
+      addDemographic: LocationSheet.#onAddDemographic,
+      removeDemographic: LocationSheet.#onRemoveDemographic,
     },
   };
 
   static PARTS = {
     body: { template: `modules/${MODULE_ID}/templates/location-sheet.hbs` },
   };
+
+  /** Localized label for a shared-pool segment key. */
+  #segmentLabel(segment) {
+    const [kind, key] = String(segment ?? "").split(":");
+    if (kind === "henchman") return game.i18n.format("ACKS-HENCHMEN.market.henchmanSegment", { level: key });
+    if (kind === "mercenary") return game.i18n.localize(`ACKS-HENCHMEN.troop.${key}`);
+    if (kind === "specialist") return game.i18n.localize(`ACKS-HENCHMEN.specialist.${key}`);
+    return segment;
+  }
+
+  #specLabel(spec) {
+    const kind = game.i18n.localize(`ACKS-HENCHMEN.posting.kind.${spec.kind}`);
+    const detail =
+      spec.classKey ||
+      spec.troopType ||
+      spec.specialistType ||
+      spec.proficiencyName ||
+      (spec.level != null ? game.i18n.format("ACKS-HENCHMEN.posting.levelN", { level: spec.level }) : "");
+    return detail ? `${kind}: ${detail}` : kind;
+  }
 
   /** @override */
   async _prepareContext(options) {
@@ -66,59 +85,92 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
       label: game.i18n.localize(v.label),
       selected: id === sys.classRarityTableId,
     }));
+    context.cultureOptions = Object.entries(getTable("people", "cultures").list).map(([id, c]) => ({
+      id,
+      label: c.label,
+    }));
+    context.demographics = (sys.demographics ?? []).map((d, index) => ({
+      ...(d.toObject?.() ?? d),
+      index,
+    }));
 
-    const candidates = sys.candidates ?? [];
-    context.postings = (sys.postings ?? []).map((p) => {
-      const week = Math.min(4, Math.floor((t - p.monthStartTime) / SECONDS_PER_WEEK) + 1);
-      const mine = candidates.filter((c) => c.postingId === p.id);
+    const candidates = (sys.candidates ?? []).map((c) => c.toObject?.() ?? c);
+    const postings = (sys.postings ?? []).map((p) => p.toObject?.() ?? p);
+
+    // --- The market: shared monthly pools ---
+    context.market = (sys.marketRolls ?? []).map((r) => {
+      const roll = r.toObject?.() ?? r;
+      const mine = candidates.filter((c) => c.segment === roll.segment);
+      const week = Math.min(4, Math.floor((t - roll.monthStartTime) / SECONDS_PER_WEEK) + 1);
       return {
-        ...(p.toObject?.() ?? p),
-        specLabel: this.#specLabel(p.spec),
+        ...roll,
+        label: this.#segmentLabel(roll.segment),
         week,
-        feesTotal: (p.feesPaid ?? []).reduce((s, f) => s + f.gp, 0),
-        availableCount: mine.filter((c) => c.status === "available").reduce((s, c) => s + (c.quantity ?? 1), 0),
-        pendingCount: mine.filter((c) => c.status === "pending").reduce((s, c) => s + (c.quantity ?? 1), 0),
-        hiredCount: mine.filter((c) => c.status === "hired").reduce((s, c) => s + (c.quantity ?? 1), 0),
-        statusLabel: game.i18n.localize(`ACKS-HENCHMEN.posting.status.${p.status}`),
-        isActive: p.status === "active",
+        arrived: mine.filter((c) => c.status === "available").reduce((s, c) => s + (c.quantity ?? 1), 0),
+        pending: mine.filter((c) => c.status === "pending").reduce((s, c) => s + (c.quantity ?? 1), 0),
+        hired: mine.filter((c) => c.status === "hired").reduce((s, c) => s + (c.quantity ?? 1), 0),
       };
     });
 
-    // Players see only ARRIVED candidates (the board shows "what your post
-    // says is available at the moment"), scoped by the visibility setting and
-    // per-posting detail masking. Pending/withdrawn rows are GM knowledge.
+    // --- Paid searches ---
+    context.postings = postings.map((p) => {
+      let employerName = "";
+      try {
+        employerName = p.employerUuid ? (fromUuidSync(p.employerUuid)?.name ?? "") : "";
+      } catch {
+        /* unresolved */
+      }
+      return {
+        ...p,
+        specLabel: this.#specLabel(p.spec),
+        employerName,
+        feesTotal: (p.feesPaid ?? []).reduce((s, f) => s + f.gp, 0),
+        statusLabel: game.i18n.localize(`ACKS-HENCHMEN.posting.status.${p.status}`),
+        isActive: p.status === "active",
+        isPrivate: !p.segment,
+      };
+    });
+
+    // --- Candidates: visibility per paid-search coverage ---
     const visibility = game.settings.get(MODULE_ID, "playerMarketVisibility");
-    const postingById = new Map((sys.postings ?? []).map((p) => [p.id, p]));
-    const userCharacterUuids = game.user.isGM
+    const ownedUuids = game.user.isGM
       ? []
       : game.actors.filter((a) => a.testUserPermission(game.user, "OWNER")).map((a) => a.uuid);
+    const coveredSegments = new Set(
+      postings
+        .filter((p) => p.status === "active" && p.segment && (game.user.isGM || ownedUuids.includes(p.employerUuid)))
+        .map((p) => p.segment)
+    );
+    const maskedSegments = new Set(
+      postings.filter((p) => p.segment && p.playersSeeDetails === false).map((p) => p.segment)
+    );
     const playerVisible = (c) => {
       if (game.user.isGM) return true;
+      if (c.privateToUuid) return ownedUuids.includes(c.privateToUuid) && ["available", "hired"].includes(c.status);
       if (visibility === "none") return false;
       if (!["available", "hired"].includes(c.status)) return false;
-      const posting = postingById.get(c.postingId);
-      if (!posting) return false;
-      if (visibility === "owned" && !userCharacterUuids.includes(posting.employerUuid)) return false;
-      return true;
+      if (visibility === "all") return true;
+      return coveredSegments.has(c.segment);
     };
+
+    const cultures = getTable("people", "cultures").list;
     context.candidates = candidates
       .filter(playerVisible)
+      .filter((c) => game.user.isGM || c.status !== "withdrawn")
       .map((c) => {
-        const obj = c.toObject?.() ?? c;
-        const posting = postingById.get(obj.postingId);
-        const masked = !game.user.isGM && posting && posting.playersSeeDetails === false;
+        const masked = !game.user.isGM && c.segment && maskedSegments.has(c.segment);
         return {
-          ...obj,
-          name: masked ? game.i18n.localize("ACKS-HENCHMEN.candidate.masked") : obj.name,
-          classKey: masked ? "" : obj.classKey,
-          template: masked ? "" : obj.template,
-          statusLabel: game.i18n.localize(`ACKS-HENCHMEN.candidate.status.${obj.status}`),
-          isAvailable: obj.status === "available",
-          hasStats: obj.attributes?.str != null,
-          statLine:
-            !masked && obj.attributes?.str != null
-              ? `${obj.attributes.str}/${obj.attributes.int}/${obj.attributes.wil}/${obj.attributes.dex}/${obj.attributes.con}/${obj.attributes.cha}`
-              : "",
+          ...c,
+          name: masked ? game.i18n.localize("ACKS-HENCHMEN.candidate.masked") : c.name,
+          cultureLabel: masked ? "" : (cultures[c.culture]?.label ?? c.culture ?? ""),
+          identityLine: masked
+            ? ""
+            : [c.level != null ? `L${c.level}` : "", c.classKey, c.occupation].filter(Boolean).join(" · "),
+          appearanceTip: masked ? "" : c.appearance,
+          isAggregate: (c.quantity ?? 1) > 1,
+          isPrivate: !!c.privateToUuid,
+          statusLabel: game.i18n.localize(`ACKS-HENCHMEN.candidate.status.${c.status}`),
+          isAvailable: c.status === "available",
         };
       })
       .sort((a, b) => (a.status === b.status ? 0 : a.status === "available" ? -1 : 1));
@@ -129,33 +181,22 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     return context;
   }
 
-  #specLabel(spec) {
-    const kind = game.i18n.localize(`ACKS-HENCHMEN.posting.kind.${spec.kind}`);
-    const detail =
-      spec.classKey ||
-      spec.troopType ||
-      spec.specialistType ||
-      spec.proficiencyName ||
-      (spec.level != null ? game.i18n.format("ACKS-HENCHMEN.posting.levelN", { level: spec.level }) : "");
-    return detail ? `${kind}: ${detail}` : kind;
-  }
-
   /**
-   * Form arrays: the slander rows render as indexed inputs
-   * (system.slander.0.partyKey…), which expandObject turns into a
-   * numeric-keyed object that ArrayField rejects. Rebuild the array, merging
-   * over the stored rows so non-input fields (time) survive.
+   * Indexed form arrays (slander rows, demographics rows) arrive as
+   * numeric-keyed objects; rebuild them, merging over stored rows.
    * @override
    */
   _prepareSubmitData(event, form, formData, updateData) {
     const data = super._prepareSubmitData(event, form, formData, updateData);
-    const submitted = foundry.utils.getProperty(data, "system.slander");
-    if (submitted && !Array.isArray(submitted)) {
-      const existing = (this.actor.system.slander ?? []).map((s) => s.toObject?.() ?? s);
-      const merged = Object.entries(submitted)
-        .sort(([a], [b]) => Number(a) - Number(b))
-        .map(([index, row]) => ({ ...(existing[Number(index)] ?? {}), ...row }));
-      foundry.utils.setProperty(data, "system.slander", merged);
+    for (const path of ["system.slander", "system.demographics"]) {
+      const submitted = foundry.utils.getProperty(data, path);
+      if (submitted && !Array.isArray(submitted)) {
+        const existing = (foundry.utils.getProperty(this.actor, path) ?? []).map((s) => s.toObject?.() ?? s);
+        const merged = Object.entries(submitted)
+          .sort(([a], [b]) => Number(a) - Number(b))
+          .map(([index, row]) => ({ ...(existing[Number(index)] ?? {}), ...row }));
+        foundry.utils.setProperty(data, path, merged);
+      }
     }
     return data;
   }
@@ -184,11 +225,7 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
 
   static async #onProcessNow() {
     const { arrived } = await processLocation(this.actor);
-    ui.notifications.info(
-      game.i18n.format("ACKS-HENCHMEN.location.processed", {
-        arrived: arrived.reduce((s, a) => s + a.count, 0),
-      })
-    );
+    ui.notifications.info(game.i18n.format("ACKS-HENCHMEN.location.processed", { arrived }));
   }
 
   static async #onAdvanceWeek() {
@@ -198,11 +235,6 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
   static async #onClosePosting(_event, target) {
     const posting = this.#posting(target);
     if (posting) await this.#updatePosting(posting.id, { status: "closed" });
-  }
-
-  static async #onRenewPosting(_event, target) {
-    const posting = this.#posting(target);
-    if (posting) await this.#updatePosting(posting.id, { renew: true });
   }
 
   static async #onTogglePlayerDetails(_event, target) {
@@ -237,6 +269,20 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     const slander = (this.actor.system.slander ?? []).map((s) => s.toObject?.() ?? s).filter((_, i) => i !== index);
     await this.actor.update({ "system.slander": slander });
   }
-}
 
-export { effectiveMarketClass };
+  static async #onAddDemographic() {
+    const demographics = [
+      ...(this.actor.system.demographics ?? []).map((d) => d.toObject?.() ?? d),
+      { culture: "auran", weight: 1 },
+    ];
+    await this.actor.update({ "system.demographics": demographics });
+  }
+
+  static async #onRemoveDemographic(_event, target) {
+    const index = Number(target.closest("[data-demographic-index]")?.dataset.demographicIndex);
+    const demographics = (this.actor.system.demographics ?? [])
+      .map((d) => d.toObject?.() ?? d)
+      .filter((_, i) => i !== index);
+    await this.actor.update({ "system.demographics": demographics });
+  }
+}

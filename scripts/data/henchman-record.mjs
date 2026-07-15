@@ -41,6 +41,15 @@ export default class HenchmanRecord extends foundry.abstract.DataModel {
       employerUuid: str(),
       hiredTime: int(),
 
+      // Generated identity (RR 495-503 People; JJ 245-257 NPCs).
+      identity: new fields.SchemaField({
+        gender: str(),
+        culture: str(),
+        age: num({ integer: true }),
+        occupation: str(),
+        appearance: str(),
+      }),
+
       // Feature 4: rolled results are RECORDED, generation is a future module.
       rolled: new fields.SchemaField({
         attributes: new fields.SchemaField({
