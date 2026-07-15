@@ -1,85 +1,24 @@
 name: Release
 
-# Canonical workflow — synced from acks-module-template. Edit it there and run
-# bin/sync-toolchain.mjs; do not hand-edit per module.
+# Thin caller — the actual release procedure lives in acks-module-template
+# (.github/workflows/release-module.yml) and propagates here automatically
+# via the @main reference. Synced from acks-module-template; do not hand-edit.
 #
-# Cut a release by pushing a version tag, e.g.:
+# Cut a release by pushing a version tag (must equal module.json version):
 #   git tag v0.1.0 && git push origin v0.1.0
-# This builds module.zip and attaches module.json + module.zip to the GitHub
-# release, which the module.json manifest URL resolves to:
-#   https://github.com/NocTempre/<id>/releases/latest/download/module.json
+# Manual "Run workflow" performs a dry run: full build + validation, no publish.
 
 on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  build-release:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Verify tag matches module.json version
-        run: |
-          MANIFEST_VERSION=$(node -p "require('./module.json').version")
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
-          echo "manifest=$MANIFEST_VERSION  tag=$TAG_VERSION"
-          if [ "$MANIFEST_VERSION" != "$TAG_VERSION" ]; then
-            echo "::error::module.json version ($MANIFEST_VERSION) does not match tag ($TAG_VERSION)"
-            exit 1
-          fi
-
-      - name: Install dev dependencies
-        run: npm ci
-
-      - name: Build compendium packs
-        run: npm run build:packs --if-present
-
-      - name: Validate scripts, templates, JSON, and packs
-        run: npm run validate --if-present
-
-      - name: Run logic tests
-        run: npm run test --if-present
-
-      - name: Verify every declared pack exists
-        run: |
-          node -e '
-            const fs = require("fs");
-            const m = require("./module.json");
-            let missing = false;
-            for (const p of m.packs ?? []) {
-              if (!fs.existsSync(p.path + "/CURRENT")) {
-                console.error(`::error::declared pack "${p.name}" is missing its compiled LevelDB at ${p.path}`);
-                missing = true;
-              }
-            }
-            if (missing) process.exit(1);
-          '
-
-      - name: Create module.zip
-        run: |
-          # Ship-by-default: everything the module needs at runtime is included
-          # automatically (docs/, ruledata/, future dirs). The -x list names
-          # dev-only paths; extend it only for new DEV-ONLY content.
-          zip -r module.zip . \
-            -x '.git/*' '.github/*' '.claude/*' 'node_modules/*' \
-               'packs/_source/*' 'tools/*' \
-               'package.json' 'package-lock.json' \
-               '.gitignore' '.gitattributes' 'CLAUDE.md' 'module.zip'
-
-      - name: Publish release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            module.json
-            module.zip
+  release:
+    uses: NocTempre/acks-module-template/.github/workflows/release-module.yml@main
+    with:
+      dry_run: ${{ github.event_name == 'workflow_dispatch' }}
