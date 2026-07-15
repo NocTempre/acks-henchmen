@@ -28,8 +28,13 @@ import { hire, checkHenchmanLimit, rollCandidateStats, rollCandidateClass, rollC
 import { onTimeAdvanced, advanceDays, now } from "./time.mjs";
 import { bindCardListeners, registerCardAction } from "./chat/cards.mjs";
 import { registerSockets, executeAsGM, registerSocketAction } from "./sockets.mjs";
-import { registerEventEngine, openLoyaltyRoll, openObedienceRoll, recordCalamity, payWagesFor } from "./engine/events.mjs";
+import { registerEventEngine, openLoyaltyRoll, openObedienceRoll, recordCalamity, payWagesFor, effectiveLoyaltyFor, effectiveMoraleFor } from "./engine/events.mjs";
 import { openRosterApp } from "./apps/roster-app.mjs";
+import { recruitMonster, hireMonster, validateMonsterRecruit } from "./engine/monster.mjs";
+import { openFollowersDialog } from "./apps/followers-dialog.mjs";
+import * as slaveryRules from "./rules/slavery.mjs";
+import * as facts from "./facts.mjs";
+import { registerInfluenceIntegration, openInfluenceFor } from "./integrations/influence.mjs";
 
 Hooks.once("init", () => {
   console.log(`${MODULE_ID} | Initializing`);
@@ -88,6 +93,15 @@ Hooks.once("setup", async () => {
     openObedienceRoll,
     recordCalamity,
     payWagesFor,
+    effectiveLoyaltyFor,
+    effectiveMoraleFor,
+    // monsters, followers, integrations
+    recruitMonster,
+    hireMonster,
+    validateMonsterRecruit,
+    openFollowersDialog,
+    openInfluenceFor,
+    facts,
     // engine
     createPosting,
     processLocation,
@@ -101,8 +115,8 @@ Hooks.once("setup", async () => {
     // data
     HenchmanRecord,
     getRecord: (actor) => HenchmanRecord.fromActor(actor),
-    // rules (pure)
-    rules: { ...availabilityRules, ...wageRules, ...loyaltyRules, ...diceRules },
+    // rules (pure; slavery rules only function with enableSlavery on)
+    rules: { ...availabilityRules, ...wageRules, ...loyaltyRules, ...diceRules, slavery: slaveryRules },
     tables: { getTable, getDoc },
     // adapter + effects (the data-driven modifier contract)
     adapter,
@@ -122,6 +136,7 @@ Hooks.once("ready", () => {
 
   registerSockets();
   registerEventEngine();
+  registerInfluenceIntegration();
 
   // GM-side due-processing whenever world time moves (posting aging, arrival
   // tranches, weekly fees, month rollover). Idempotent per posting.

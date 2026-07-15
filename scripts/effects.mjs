@@ -168,6 +168,36 @@ export function hasEffectFlag(actor, domain) {
 }
 
 /**
+ * Collect string-valued effect flags of a domain (e.g. recruitKinds — CSV
+ * strings like "animal,fungal" from Beast Friendship / Fungal Friendship).
+ * @returns {Set<string>}
+ */
+export function collectStringFlags(actor, domain) {
+  const out = new Set();
+  const key = `${EFFECT_PREFIX}${domain}`;
+  for (const effect of appliedEffects(actor)) {
+    if (effect.disabled) continue;
+    for (const change of effect.changes ?? []) {
+      if (change.key !== key) continue;
+      String(change.value ?? "")
+        .split(",")
+        .map((s) => s.trim().toLowerCase())
+        .filter(Boolean)
+        .forEach((s) => out.add(s));
+    }
+  }
+  // Name fallback: Beast Friendship / Friend(s) of Birds and Beasts unlock animals.
+  if (domain === "recruitKinds" && actor?.items) {
+    for (const item of actor.items) {
+      if (item.type !== "ability" && item.type !== "item") continue;
+      if (/^beast friendship|^close friend of birds|^friends? of birds? and beasts?/i.test(item.name ?? "")) out.add("animal");
+      if (/^fungal friendship/i.test(item.name ?? "")) out.add("fungal");
+    }
+  }
+  return out;
+}
+
+/**
  * Convert found modifiers into ThrowDialog dynamic-modifier rows:
  * always-on ones arrive checked+locked, situational ones as toggles.
  */

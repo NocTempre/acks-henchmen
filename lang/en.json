@@ -345,6 +345,31 @@
   "ACKS-HENCHMEN.roster.dismissTitle": "Dismiss {name}?",
   "ACKS-HENCHMEN.roster.dismissBody": "{name} leaves the roster. The actor is not deleted.",
 
+  "ACKS-HENCHMEN.monster.hdCap": "A monster of {hd} HD cannot serve an employer of level {level} — its HD must be LOWER than the employer's level (MM 351).",
+  "ACKS-HENCHMEN.monster.animalGate": "Recruiting normal animals requires Beast Friendship or Friends of Birds and Beasts (MM 351). Sapient beastmen/giants/humanoids/monstrosities/undead are open to anyone.",
+  "ACKS-HENCHMEN.monster.info": "Recruiting {name} ({hd} HD — wage {wage} gp/month using HD as level, plus a half share if sapient).",
+  "ACKS-HENCHMEN.monster.hiredNote": "Entered service of {employer} ({hd} HD)",
+  "ACKS-HENCHMEN.monster.feigned.betrayal": "<strong>GM only:</strong> {name} only FEIGNS acceptance — it secretly loathes its employer and will betray the party when opportunity arises (Irrefusable Offer 2−).",
+  "ACKS-HENCHMEN.monster.feigned.escape": "<strong>GM only:</strong> {name} only FEIGNS acceptance to save its life — it will desert at the first safe opportunity (Irrefusable Offer 3-5).",
+
+  "ACKS-HENCHMEN.followers.levelGate": "{name} is level {level} — followers arrive at 9th level with a stronghold (RR 334).",
+  "ACKS-HENCHMEN.followers.title": "Generate followers — {name}",
+  "ACKS-HENCHMEN.followers.strongholdReq": "{stronghold}, min {value} gp",
+  "ACKS-HENCHMEN.followers.strongholdFound": "Stronghold on record: {name} ({value} gp).",
+  "ACKS-HENCHMEN.followers.strongholdMissing": "No stronghold found (checked module APIs, flags, and inventory markers like \"Stronghold: Castle\"). The Judge decides whether followers arrive.",
+  "ACKS-HENCHMEN.followers.troopsGeneric": "troops (see class table)",
+  "ACKS-HENCHMEN.followers.troopsResult": "{count} × level-{level} troops — platoon types: {types}",
+  "ACKS-HENCHMEN.followers.companionsResult": "{count} × {class} companions, levels: {levels}",
+  "ACKS-HENCHMEN.followers.apprenticesResult": "{count} × 0th-level apprentices",
+  "ACKS-HENCHMEN.followers.loyaltyFanatic": "Fanatic followers: loyalty and morale start at +4 and they make NO loyalty rolls on calamities (morale rolls still apply).",
+  "ACKS-HENCHMEN.followers.loyaltyDefault": "Followers start at loyalty +2, morale +1 over the equipment baseline.",
+  "ACKS-HENCHMEN.followers.slotNote": "Apprentices and companions serve as henchmen WITHOUT consuming henchman slots; military followers act as mercenaries but follow on adventures (RR 335). Hire them with origin \"follower\" so the record marks them no-slot.",
+  "ACKS-HENCHMEN.followers.rolled": "Follower grants rolled — see the GM chat card.",
+  "ACKS-HENCHMEN.followers.cardTitle": "Followers arrive: {name} ({class})",
+
+  "ACKS-HENCHMEN.influence.slanderLabel": "Slander against the party in {name}",
+  "ACKS-HENCHMEN.influence.rollNote": "Influence by {name}: {tone} → {band} (attitude {attitude})",
+
   "ACKS-HENCHMEN.command.recruit": "Open the recruitment board",
   "ACKS-HENCHMEN.command.noLocations": "No recruitment locations exist yet. Create a Location actor first.",
 
