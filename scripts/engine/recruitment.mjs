@@ -16,7 +16,8 @@
  * arrivalPlan.materialized watermarks, so updateWorldTime re-fires are safe.
  */
 import { MODULE_ID, HOOKS, SECONDS_PER_WEEK } from "../constants.mjs";
-import { rollMonthlyPool, arrivalSplit, shiftMarketClass, searchFeeFormula } from "../rules/availability.mjs";
+import { rollMonthlyPool, arrivalSplit, shiftMarketClass, searchFeeFormula, clampMarketClass } from "../rules/availability.mjs";
+import { rollClassFromGrid, rollRandomLevel, rollProficiencyLevel } from "../rules/candidates.mjs";
 import { henchmanWage } from "../rules/wages.mjs";
 import { sumEffectModifiers } from "../effects.mjs";
 import * as adapter from "../acks-adapter.mjs";
@@ -64,7 +65,11 @@ async function rollMonthForPosting(location, posting, employer) {
   const [w1, w2, w3] = arrivalSplit(total);
   const monthStart = now();
   const candidates = [];
-  const individual = ["henchman", "henchmanByClass", "henchmanByProficiency"].includes(posting.spec.kind) && (posting.spec.level ?? 0) > 0;
+  const kind = posting.spec.kind;
+  const leveled = ["henchman", "henchmanByClass", "henchmanByProficiency"].includes(kind);
+  // 0th-level generic henchmen and mercenaries/specialists/laborers stay
+  // aggregated; anything with an individual class/level gets its own row.
+  const individual = leveled && (kind !== "henchman" || (posting.spec.level ?? 0) > 0);
   const weeks = [
     { week: 1, count: w1 },
     { week: 2, count: w2 },
@@ -75,7 +80,7 @@ async function rollMonthForPosting(location, posting, employer) {
     const availableFromTime = monthStart + (week - 1) * SECONDS_PER_WEEK;
     const base = {
       postingId: posting.id,
-      kind: posting.spec.kind,
+      kind,
       level: posting.spec.level ?? null,
       classKey: posting.spec.classKey ?? "",
       classRarity: result.rarity ?? "",
@@ -87,8 +92,36 @@ async function rollMonthForPosting(location, posting, employer) {
       status: "pending",
     };
     if (individual) {
+      // ANTI-FISHING: each candidate's class and level are FIXED here, when
+      // the month's pool is rolled — never rerollable afterwards. Attributes
+      // roll once at hire (engine/hire.mjs).
       for (let i = 0; i < count; i++) {
-        candidates.push({ ...base, id: foundry.utils.randomID(), name: randomName(posting.spec), quantity: 1 });
+        const candidate = { ...base, id: foundry.utils.randomID(), quantity: 1 };
+        if (kind === "henchman") {
+          // Leveled generic henchman: class from the double-d100 grid.
+          const rolled = await rollClassFromGrid(rollDice);
+          candidate.classKey = rolled.classKey;
+          candidate.doubleD100 = rolled.rolls;
+        } else if (kind === "henchmanByClass") {
+          // Sought class is fixed; level 0 in the spec = roll it (JJ 118).
+          if (!candidate.level || candidate.level <= 0) {
+            const rolled = await rollRandomLevel(rollDice, clampMarketClass(mc));
+            candidate.level = rolled.level;
+          }
+        } else if (kind === "henchmanByProficiency") {
+          // Random class + the 1d4 proficiency-level rule (JJ 119).
+          const cls = await rollClassFromGrid(rollDice);
+          const lvl = await rollProficiencyLevel(rollDice, clampMarketClass(mc));
+          candidate.classKey = lvl.level > 0 ? cls.classKey : "";
+          candidate.doubleD100 = lvl.level > 0 ? cls.rolls : [];
+          candidate.level = lvl.level;
+          candidate.notes = posting.spec.proficiencyName
+            ? `${posting.spec.proficiencyName} ×${posting.spec.proficiencyRanks ?? 1}`
+            : "";
+        }
+        candidate.wageGp = henchmanWage(candidate.level ?? 0);
+        candidate.name = randomName({ ...posting.spec, classKey: candidate.classKey, level: candidate.level });
+        candidates.push(candidate);
       }
     } else {
       candidates.push({ ...base, id: foundry.utils.randomID(), name: randomName(posting.spec), quantity: count });

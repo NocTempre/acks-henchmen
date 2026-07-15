@@ -129,11 +129,6 @@
           <td>{{#if wageGp}}{{wageGp}} gp/{{wageUnit}}{{/if}}</td>
           <td>{{statusLabel}}</td>
           <td class="row-actions">
-            {{#if rollable}}
-            <a data-action="rollStats" data-tooltip="{{localize 'ACKS-HENCHMEN.candidate.rollStats'}}"><i class="fas fa-dice-six"></i></a>
-            <a data-action="rollClass" data-tooltip="{{localize 'ACKS-HENCHMEN.candidate.rollClass'}}"><i class="fas fa-hat-wizard"></i></a>
-            <a data-action="rollLevel" data-tooltip="{{localize 'ACKS-HENCHMEN.candidate.rollLevel'}}"><i class="fas fa-arrow-up-1-9"></i></a>
-            {{/if}}
             {{#if isAvailable}}
             <a data-action="recruit" data-tooltip="{{localize 'ACKS-HENCHMEN.candidate.recruit'}}"><i class="fas fa-handshake"></i></a>
             {{/if}}

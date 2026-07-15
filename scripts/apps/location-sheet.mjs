@@ -13,7 +13,6 @@ import { MODULE_ID, SECONDS_PER_WEEK } from "../constants.mjs";
 import { getTable } from "../rules/tables.mjs";
 import { processLocation, effectiveMarketClass } from "../engine/recruitment.mjs";
 import { openPostingDialog } from "./posting-dialog.mjs";
-import { rollCandidateStats, rollCandidateClass, rollCandidateLevel } from "../engine/hire.mjs";
 import { openRecruitDialog } from "./recruit-dialog.mjs";
 import { now } from "../time.mjs";
 import { advanceDays } from "../time.mjs";
@@ -34,9 +33,6 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
       closePosting: LocationSheet.#onClosePosting,
       renewPosting: LocationSheet.#onRenewPosting,
       togglePlayerDetails: LocationSheet.#onTogglePlayerDetails,
-      rollStats: LocationSheet.#onRollStats,
-      rollClass: LocationSheet.#onRollClass,
-      rollLevel: LocationSheet.#onRollLevel,
       recruit: LocationSheet.#onRecruit,
       removeCandidate: LocationSheet.#onRemoveCandidate,
       addSlander: LocationSheet.#onAddSlander,
@@ -123,7 +119,6 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
             !masked && obj.attributes?.str != null
               ? `${obj.attributes.str}/${obj.attributes.int}/${obj.attributes.wil}/${obj.attributes.dex}/${obj.attributes.con}/${obj.attributes.cha}`
               : "",
-          rollable: game.user.isGM && ["henchman", "henchmanByClass", "henchmanByProficiency"].includes(obj.kind),
         };
       })
       .sort((a, b) => (a.status === b.status ? 0 : a.status === "available" ? -1 : 1));
@@ -213,21 +208,6 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
   static async #onTogglePlayerDetails(_event, target) {
     const posting = this.#posting(target);
     if (posting) await this.#updatePosting(posting.id, { playersSeeDetails: !posting.playersSeeDetails });
-  }
-
-  static async #onRollStats(_event, target) {
-    const candidate = this.#candidate(target);
-    if (candidate) await rollCandidateStats(this.actor, candidate.id);
-  }
-
-  static async #onRollClass(_event, target) {
-    const candidate = this.#candidate(target);
-    if (candidate) await rollCandidateClass(this.actor, candidate.id);
-  }
-
-  static async #onRollLevel(_event, target) {
-    const candidate = this.#candidate(target);
-    if (candidate) await rollCandidateLevel(this.actor, candidate.id);
   }
 
   static async #onRecruit(_event, target) {

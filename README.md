@@ -16,11 +16,12 @@ Companion module for the official ACKS II system (`acks`) for Foundry VTT
   Reaction to Hiring Offer with Charisma, proficiency effects, signing
   bonuses (Bribery-aware pricing), sweeten-the-deal re-rolls, cumulative
   refusal penalties, and the refuse-and-slander town registry.
-- **Stat & template rolling — record the result** — 3d6×6 attributes, the JJ
-  GM-screen double-d100 class grid, and 1d20 level rolls are recorded on the
-  candidate and carried onto the hired actor (`HenchmanRecord`). Class
-  auto-generation is a future module that consumes these records via the
-  `acks-henchmen.hired` hook.
+- **Stat & template rolling — record the result** — each candidate's class
+  (JJ double-d100 grid) and level (1d20 table) are **fixed when the monthly
+  pool is rolled** — no rerolling until you like the result; attributes
+  (3d6×6) roll exactly once, at hire. Everything is recorded on the hired
+  actor (`HenchmanRecord`); class auto-generation is a future module that
+  consumes these records via the `acks-henchmen.hired` hook.
 - **Loyalty & morale automation** — secret (GM-whispered) Hireling Loyalty
   and Obedience throws with natural-2/12 clamps; calamity detection when a
   hireling drops to 0 hp; level-up loyalty rolls; the full permanent-modifier

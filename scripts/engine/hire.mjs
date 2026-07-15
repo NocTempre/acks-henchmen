@@ -4,14 +4,13 @@
  * module) and the hire pipeline.
  */
 import { MODULE_ID, HOOKS, FLAG_RECORD } from "../constants.mjs";
-import { getTable } from "../rules/tables.mjs";
 import { henchmanWage } from "../rules/wages.mjs";
 import { startingLoyalty, effectiveLoyalty } from "../rules/loyalty.mjs";
+import { rollAttributes } from "../rules/candidates.mjs";
 import { sumEffectModifiers, hasEffectFlag } from "../effects.mjs";
 import * as adapter from "../acks-adapter.mjs";
 import HenchmanRecord from "../data/henchman-record.mjs";
 import { now } from "../time.mjs";
-import { postEventCard } from "../chat/cards.mjs";
 
 async function roll(formula) {
   return (await new Roll(formula).evaluate()).total;
@@ -30,72 +29,6 @@ export async function updateCandidate(location, candidateId, changes) {
 function getCandidate(location, candidateId) {
   const c = (location.system.candidates ?? []).find((x) => x.id === candidateId);
   return c ? (c.toObject?.() ?? foundry.utils.deepClone(c)) : null;
-}
-
-/** 3d6 in order, six times (RR: henchmen are rolled up like PCs). */
-export async function rollCandidateStats(location, candidateId) {
-  const keys = ["str", "int", "wil", "dex", "con", "cha"];
-  const attributes = {};
-  for (const key of keys) attributes[key] = await roll("3d6");
-  const candidate = await updateCandidate(location, candidateId, { attributes });
-  await postEventCard({
-    titleKey: "ACKS-HENCHMEN.card.statsRolled",
-    bodyKey: "ACKS-HENCHMEN.card.statsRolledBody",
-    data: {
-      name: candidate?.name ?? "?",
-      stats: keys.map((k) => `${k.toUpperCase()} ${attributes[k]}`).join(", "),
-    },
-    actor: location,
-  });
-  Hooks.callAll(HOOKS.CANDIDATE_ROLLED, { location, candidateId, kind: "stats", attributes });
-  return attributes;
-}
-
-/**
- * Random class via the JJ GM-screen double-d100 grid: first d100 picks the
- * row band, second picks the column band. "special" → Judge picks from
- * AXIOMS/BTA/HFH/Player's Companion.
- */
-export async function rollCandidateClass(location, candidateId) {
-  const grid = getTable("rarity", "leveledClassGrid");
-  const rowRoll = await roll("1d100");
-  const colRoll = await roll("1d100");
-  const row = grid.rows.find((r) => rowRoll >= r.min && rowRoll <= r.max);
-  const colIndex = grid.columns.findIndex((c) => colRoll >= c.min && colRoll <= c.max);
-  const classKey = row?.classes?.[colIndex] ?? "special";
-  const candidate = await updateCandidate(location, candidateId, {
-    classKey,
-    doubleD100: [rowRoll, colRoll],
-  });
-  await postEventCard({
-    titleKey: "ACKS-HENCHMEN.card.classRolled",
-    bodyKey: "ACKS-HENCHMEN.card.classRolledBody",
-    data: { name: candidate?.name ?? "?", rowRoll, colRoll, classKey },
-    actor: location,
-  });
-  Hooks.callAll(HOOKS.CANDIDATE_ROLLED, { location, candidateId, kind: "class", classKey, rolls: [rowRoll, colRoll] });
-  return classKey;
-}
-
-/** Random level (JJ): 1d20, −2 in a Class VI market. */
-export async function rollCandidateLevel(location, candidateId) {
-  const table = getTable("rarity", "randomHenchmanLevel");
-  const penalty = location.system.marketClass === 6 ? table.classVIPenalty : 0;
-  const die = await roll("1d20");
-  const total = die + penalty;
-  const row = table.rows.find(
-    (r) => (r.min === undefined || total >= r.min) && (r.max === undefined || total <= r.max)
-  ) ?? table.rows[0];
-  const level = row.level;
-  const candidate = await updateCandidate(location, candidateId, { level, wageGp: henchmanWage(level) });
-  await postEventCard({
-    titleKey: "ACKS-HENCHMEN.card.levelRolled",
-    bodyKey: "ACKS-HENCHMEN.card.levelRolledBody",
-    data: { name: candidate?.name ?? "?", die, penalty, level },
-    actor: location,
-  });
-  Hooks.callAll(HOOKS.CANDIDATE_ROLLED, { location, candidateId, kind: "level", level });
-  return level;
 }
 
 /**
@@ -137,6 +70,13 @@ export async function hire(location, candidateId, employer, opts = {}) {
   const candidate = getCandidate(location, candidateId);
   if (!candidate) return { error: "no-candidate" };
   if (!["available"].includes(candidate.status)) return { error: "not-available" };
+
+  // Attributes roll ONCE, at hire (3d6 ×6 in order, RR 168) — class and
+  // level were fixed when the monthly pool was rolled.
+  if (candidate.attributes?.str == null) {
+    candidate.attributes = await rollAttributes(roll);
+    await updateCandidate(location, candidateId, { attributes: candidate.attributes });
+  }
 
   const category = opts.category ?? (candidate.kind === "mercenary" ? "mercenary" : candidate.kind === "specialist" ? "specialist" : "henchman");
 

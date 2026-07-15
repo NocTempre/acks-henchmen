@@ -24,7 +24,8 @@ import { ThrowDialog, openThrowDialog } from "./apps/throw-dialog.mjs";
 import { openPostingDialog } from "./apps/posting-dialog.mjs";
 import { openRecruitDialog } from "./apps/recruit-dialog.mjs";
 import { createPosting, processLocation, processAllLocations, effectiveMarketClass } from "./engine/recruitment.mjs";
-import { hire, checkHenchmanLimit, rollCandidateStats, rollCandidateClass, rollCandidateLevel } from "./engine/hire.mjs";
+import { hire, checkHenchmanLimit } from "./engine/hire.mjs";
+import * as candidateRules from "./rules/candidates.mjs";
 import { onTimeAdvanced, advanceDays, now } from "./time.mjs";
 import { bindCardListeners, registerCardAction } from "./chat/cards.mjs";
 import { registerSockets, executeAsGM, registerSocketAction } from "./sockets.mjs";
@@ -109,14 +110,11 @@ Hooks.once("setup", async () => {
     effectiveMarketClass,
     hire,
     checkHenchmanLimit,
-    rollCandidateStats,
-    rollCandidateClass,
-    rollCandidateLevel,
     // data
     HenchmanRecord,
     getRecord: (actor) => HenchmanRecord.fromActor(actor),
     // rules (pure; slavery rules only function with enableSlavery on)
-    rules: { ...availabilityRules, ...wageRules, ...loyaltyRules, ...diceRules, slavery: slaveryRules },
+    rules: { ...availabilityRules, ...wageRules, ...loyaltyRules, ...diceRules, ...candidateRules, slavery: slaveryRules },
     tables: { getTable, getDoc },
     // adapter + effects (the data-driven modifier contract)
     adapter,
@@ -161,9 +159,9 @@ Hooks.once("ready", () => {
   }
 });
 
-/* Bind event-card buttons (v13 jQuery + v14 HTMLElement signatures). */
+/* Bind event-card buttons (v14 AppV2 convention: HTMLElement hook only —
+ * registering the legacy jQuery hook triggers a deprecation warning). */
 Hooks.on("renderChatMessageHTML", (_message, html) => bindCardListeners(html));
-Hooks.on("renderChatMessage", (_message, html) => bindCardListeners(html));
 
 /* Roster button on acks character sheets (additive DOM only — the
  * acks-domains/acks-influence injection pattern, dedupe-guarded). */
