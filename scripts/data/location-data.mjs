@@ -147,6 +147,14 @@ export class LocationData extends foundry.abstract.TypeDataModel {
         base: int(0),
         encounter: int(0),
       }),
+      // The system's setup-hook migration (updateWeightsLanguages) calls
+      // actor.updateImplements() on EVERY actor, reading
+      // system.saves.implements/.wand unguarded. Value 0 (≠ -1) makes the
+      // migration a no-op for locations.
+      saves: new fields.SchemaField({
+        wand: new fields.SchemaField({ value: int(0) }),
+        implements: new fields.SchemaField({ value: int(0) }),
+      }),
       // --- location data -------------------------------------------------
       region: str(),
       notes: new fields.HTMLField({ required: false, blank: true, initial: "" }),
