@@ -154,18 +154,29 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     };
 
     const cultures = getTable("people", "cultures").list;
-    context.candidates = candidates
+    const henchKinds = ["henchman", "henchmanByClass", "henchmanByProficiency"];
+    const rows = candidates
       .filter(playerVisible)
       .filter((c) => game.user.isGM || c.status !== "withdrawn")
       .map((c) => {
         const masked = !game.user.isGM && c.segment && maskedSegments.has(c.segment);
+        const isHench = henchKinds.includes(c.kind);
+        let identityLine = "";
+        if (!masked) {
+          if (isHench) {
+            identityLine = [c.level != null ? `L${c.level}` : "", c.classKey, c.occupation]
+              .filter(Boolean)
+              .join(" · ");
+            if (c.notes) identityLine = [identityLine, c.notes].filter(Boolean).join(" · ");
+          } else if (c.kind === "specialist") {
+            identityLine = game.i18n.localize(`ACKS-HENCHMEN.specialist.${c.specialistType}`);
+          }
+        }
         return {
           ...c,
           name: masked ? game.i18n.localize("ACKS-HENCHMEN.candidate.masked") : c.name,
           cultureLabel: masked ? "" : (cultures[c.culture]?.label ?? c.culture ?? ""),
-          identityLine: masked
-            ? ""
-            : [c.level != null ? `L${c.level}` : "", c.classKey, c.occupation].filter(Boolean).join(" · "),
+          identityLine,
           appearanceTip: masked ? "" : c.appearance,
           isAggregate: (c.quantity ?? 1) > 1,
           isPrivate: !!c.privateToUuid,
@@ -174,11 +185,57 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
         };
       })
       .sort((a, b) => (a.status === b.status ? 0 : a.status === "available" ? -1 : 1));
+    context.henchmenRows = rows.filter((c) => henchKinds.includes(c.kind));
+    context.mercenaryRows = rows.filter((c) => c.kind === "mercenary");
+    context.specialistRows = rows.filter((c) => c.kind === "specialist");
+    context.candidateCount = rows.length;
 
     context.slander = (sys.slander ?? []).map((s, index) => ({ ...(s.toObject?.() ?? s), index }));
     context.ledger = (sys.searchLedger ?? []).slice(-20).reverse();
     context.ledgerTotal = (sys.searchLedger ?? []).reduce((s, l) => s + l.gp, 0);
     return context;
+  }
+
+  /**
+   * Candidate-list ergonomics for big markets: a text filter and
+   * click-to-sort headers, both pure DOM (no re-render, keeps the sheet
+   * snappy at Class I scale).
+   * @override
+   */
+  _onRender(context, options) {
+    super._onRender(context, options);
+    const root = this.element;
+
+    const filterInput = root.querySelector("[data-candidate-filter]");
+    if (filterInput) {
+      filterInput.addEventListener("input", () => {
+        const needle = filterInput.value.trim().toLowerCase();
+        root.querySelectorAll(".candidates-table tbody tr").forEach((tr) => {
+          tr.style.display = !needle || tr.textContent.toLowerCase().includes(needle) ? "" : "none";
+        });
+      });
+    }
+
+    root.querySelectorAll(".candidates-table th[data-sortable]").forEach((th) => {
+      th.addEventListener("click", () => {
+        const table = th.closest("table");
+        const tbody = table.querySelector("tbody");
+        const index = [...th.parentElement.children].indexOf(th);
+        const ascending = th.dataset.sortDir !== "asc";
+        table.querySelectorAll("th[data-sortable]").forEach((h) => delete h.dataset.sortDir);
+        th.dataset.sortDir = ascending ? "asc" : "desc";
+        const rows = [...tbody.querySelectorAll("tr")];
+        rows.sort((a, b) => {
+          const av = a.children[index]?.textContent.trim() ?? "";
+          const bv = b.children[index]?.textContent.trim() ?? "";
+          const an = parseFloat(av);
+          const bn = parseFloat(bv);
+          const cmp = Number.isFinite(an) && Number.isFinite(bn) ? an - bn : av.localeCompare(bv);
+          return ascending ? cmp : -cmp;
+        });
+        rows.forEach((r) => tbody.appendChild(r));
+      });
+    });
   }
 
   /**

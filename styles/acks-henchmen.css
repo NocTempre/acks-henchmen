@@ -229,6 +229,37 @@
   font-style: italic;
 }
 
+.acks-henchmen.location-sheet .candidate-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.25rem 0 0.4rem;
+}
+
+.acks-henchmen.location-sheet .candidate-filter input {
+  flex: 1;
+}
+
+.acks-henchmen.location-sheet .bucket-header {
+  margin: 0.5rem 0 0.15rem;
+  border-bottom: 1px solid var(--color-border-light-tertiary, #b5b3a4);
+}
+
+.acks-henchmen.location-sheet .candidates-table th[data-sortable] {
+  cursor: pointer;
+  user-select: none;
+}
+
+.acks-henchmen.location-sheet .candidates-table th[data-sort-dir="asc"]::after {
+  content: " ▲";
+  font-size: 0.75em;
+}
+
+.acks-henchmen.location-sheet .candidates-table th[data-sort-dir="desc"]::after {
+  content: " ▼";
+  font-size: 0.75em;
+}
+
 .acks-henchmen.location-sheet .row-actions {
   white-space: nowrap;
 }

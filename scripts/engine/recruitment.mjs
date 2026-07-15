@@ -119,19 +119,28 @@ async function buildCandidates({ location, spec, total, marketClass, segment, pr
     };
 
     if (mass) {
-      // Troop-scale: one aggregated row per arrival week.
+      // Troop-scale: one aggregated row per arrival week. The combined
+      // composite/longbow entry resolves to the settlement's variant
+      // (RR 164: a settlement has one of the two, not both); troop types
+      // without a human wage (e.g. dwarven mounted crossbowmen) fall back
+      // to their race's wage.
+      let wageType = spec.troopType;
+      let labelKey = spec.kind === "mercenary" ? `ACKS-HENCHMEN.troop.${spec.troopType}` : `ACKS-HENCHMEN.specialist.${spec.specialistType}`;
+      if (spec.troopType === "compositeBowmanLongbowman") {
+        wageType = location.system.compositeVariant === "longbow" ? "longbowman" : "compositeBowman";
+        labelKey = `ACKS-HENCHMEN.troop.${wageType}`;
+      }
       const row =
         spec.kind === "mercenary"
-          ? getTable("wages", "mercenaryWages").rows.find((r) => r.type === spec.troopType)
+          ? getTable("wages", "mercenaryWages").rows.find((r) => r.type === wageType)
           : getTable("availability", "specialistAvailability").rows.find((r) => r.type === spec.specialistType);
+      const mercWage = row?.wages ? (row.wages.man ?? Object.values(row.wages).find((w) => w != null) ?? null) : null;
       candidates.push({
         ...base,
         id: foundry.utils.randomID(),
-        name: game.i18n.localize(
-          spec.kind === "mercenary" ? `ACKS-HENCHMEN.troop.${spec.troopType}` : `ACKS-HENCHMEN.specialist.${spec.specialistType}`
-        ),
+        name: game.i18n.localize(labelKey),
         quantity: count,
-        wageGp: spec.kind === "mercenary" ? (row?.wages?.man ?? null) : (row?.wage ?? null),
+        wageGp: spec.kind === "mercenary" ? mercWage : (row?.wage ?? null),
         wageUnit: spec.kind === "mercenary" ? "month" : (row?.wageUnit ?? "month"),
       });
       continue;
@@ -184,8 +193,14 @@ async function buildCandidates({ location, spec, total, marketClass, segment, pr
       candidate.culture = identity.culture;
       candidate.age = identity.age;
       candidate.appearance = identity.appearance;
-      if (!candidate.occupation && identity.occupation) candidate.occupation = identity.occupation;
-      if (!candidate.classKey && identity.classKey) candidate.classKey = identity.classKey;
+      // Occupation + class trajectory belong ONLY to 0th-level henchman
+      // prospects (JJ 247/254). A specialist's occupation IS their type;
+      // leveled candidates have real classes already.
+      const henchKind = ["henchman", "henchmanByClass", "henchmanByProficiency"].includes(spec.kind);
+      if (henchKind && (candidate.level ?? 0) === 0) {
+        if (!candidate.occupation && identity.occupation) candidate.occupation = identity.occupation;
+        if (!candidate.classKey && identity.classKey) candidate.classKey = identity.classKey;
+      }
       candidates.push(candidate);
     }
   }

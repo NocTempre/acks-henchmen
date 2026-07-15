@@ -55,6 +55,13 @@
         <label data-tooltip="{{localize 'ACKS-HENCHMEN.location.desertHint'}}">{{localize "ACKS-HENCHMEN.location.desert"}}</label>
         <input type="checkbox" name="system.desertRealm" {{#if system.desertRealm}}checked{{/if}} />
       </div>
+      <div class="form-group">
+        <label data-tooltip="{{localize 'ACKS-HENCHMEN.location.compositeHint'}}">{{localize "ACKS-HENCHMEN.location.composite"}}</label>
+        <select name="system.compositeVariant">
+          <option value="composite" {{#if (eq system.compositeVariant "composite")}}selected{{/if}}>{{localize "ACKS-HENCHMEN.troop.compositeBowman"}}</option>
+          <option value="longbow" {{#if (eq system.compositeVariant "longbow")}}selected{{/if}}>{{localize "ACKS-HENCHMEN.troop.longbowman"}}</option>
+        </select>
+      </div>
     </div>
     <div class="demographics-block">
       <label class="block-label" data-tooltip="{{localize 'ACKS-HENCHMEN.location.demographicsHint'}}">
@@ -152,24 +159,31 @@
   </details>
 
   <details class="section" open>
-    <summary>{{localize "ACKS-HENCHMEN.location.candidates"}} ({{candidates.length}})</summary>
-    {{#if candidates.length}}
+    <summary>{{localize "ACKS-HENCHMEN.location.candidates"}} ({{candidateCount}})</summary>
+    {{#if candidateCount}}
+    <div class="candidate-filter">
+      <i class="fas fa-magnifying-glass"></i>
+      <input type="text" data-candidate-filter placeholder="{{localize 'ACKS-HENCHMEN.candidate.filter'}}" />
+    </div>
+
+    {{#if henchmenRows.length}}
+    <h4 class="bucket-header">{{localize "ACKS-HENCHMEN.bucket.henchmen"}} ({{henchmenRows.length}})</h4>
     <table class="candidates-table">
       <thead>
         <tr>
-          <th>{{localize "ACKS-HENCHMEN.candidate.name"}}</th>
-          <th>{{localize "ACKS-HENCHMEN.candidate.age"}}</th>
-          <th>{{localize "ACKS-HENCHMEN.candidate.culture"}}</th>
-          <th>{{localize "ACKS-HENCHMEN.candidate.identity"}}</th>
-          <th>{{localize "ACKS-HENCHMEN.candidate.wage"}}</th>
-          <th>{{localize "ACKS-HENCHMEN.candidate.statusHeader"}}</th>
+          <th data-sortable>{{localize "ACKS-HENCHMEN.candidate.name"}}</th>
+          <th data-sortable>{{localize "ACKS-HENCHMEN.candidate.age"}}</th>
+          <th data-sortable>{{localize "ACKS-HENCHMEN.candidate.culture"}}</th>
+          <th data-sortable>{{localize "ACKS-HENCHMEN.candidate.identity"}}</th>
+          <th data-sortable>{{localize "ACKS-HENCHMEN.candidate.wage"}}</th>
+          <th data-sortable>{{localize "ACKS-HENCHMEN.candidate.statusHeader"}}</th>
           <th></th>
         </tr>
       </thead>
       <tbody>
-        {{#each candidates}}
+        {{#each henchmenRows}}
         <tr data-candidate-id="{{id}}" class="status-{{status}}">
-          <td data-tooltip="{{appearanceTip}}">{{name}}{{#if isAggregate}} ×{{quantity}}{{/if}}{{#if isPrivate}} <i class="fas fa-user-lock" data-tooltip="{{localize 'ACKS-HENCHMEN.posting.privateHint'}}"></i>{{/if}}</td>
+          <td data-tooltip="{{appearanceTip}}">{{name}}{{#if isPrivate}} <i class="fas fa-user-lock" data-tooltip="{{localize 'ACKS-HENCHMEN.posting.privateHint'}}"></i>{{/if}}</td>
           <td>{{age}}</td>
           <td>{{cultureLabel}}</td>
           <td>{{identityLine}}</td>
@@ -187,6 +201,77 @@
         {{/each}}
       </tbody>
     </table>
+    {{/if}}
+
+    {{#if mercenaryRows.length}}
+    <h4 class="bucket-header">{{localize "ACKS-HENCHMEN.bucket.mercenaries"}} ({{mercenaryRows.length}})</h4>
+    <table class="candidates-table">
+      <thead>
+        <tr>
+          <th data-sortable>{{localize "ACKS-HENCHMEN.candidate.troopType"}}</th>
+          <th data-sortable>{{localize "ACKS-HENCHMEN.candidate.qty"}}</th>
+          <th data-sortable>{{localize "ACKS-HENCHMEN.candidate.wage"}}</th>
+          <th data-sortable>{{localize "ACKS-HENCHMEN.candidate.statusHeader"}}</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#each mercenaryRows}}
+        <tr data-candidate-id="{{id}}" class="status-{{status}}">
+          <td>{{name}}</td>
+          <td>{{quantity}}</td>
+          <td>{{#if wageGp}}{{wageGp}} gp/{{wageUnit}}{{/if}}</td>
+          <td>{{statusLabel}}</td>
+          <td class="row-actions">
+            {{#if isAvailable}}
+            <a data-action="recruit" data-tooltip="{{localize 'ACKS-HENCHMEN.candidate.recruit'}}"><i class="fas fa-handshake"></i></a>
+            {{/if}}
+            {{#if @root.isGM}}
+            <a data-action="removeCandidate" data-tooltip="{{localize 'ACKS-HENCHMEN.candidate.remove'}}"><i class="fas fa-trash"></i></a>
+            {{/if}}
+          </td>
+        </tr>
+        {{/each}}
+      </tbody>
+    </table>
+    {{/if}}
+
+    {{#if specialistRows.length}}
+    <h4 class="bucket-header">{{localize "ACKS-HENCHMEN.bucket.specialists"}} ({{specialistRows.length}})</h4>
+    <table class="candidates-table">
+      <thead>
+        <tr>
+          <th data-sortable>{{localize "ACKS-HENCHMEN.candidate.name"}}</th>
+          <th data-sortable>{{localize "ACKS-HENCHMEN.candidate.age"}}</th>
+          <th data-sortable>{{localize "ACKS-HENCHMEN.candidate.culture"}}</th>
+          <th data-sortable>{{localize "ACKS-HENCHMEN.candidate.specialty"}}</th>
+          <th data-sortable>{{localize "ACKS-HENCHMEN.candidate.wage"}}</th>
+          <th data-sortable>{{localize "ACKS-HENCHMEN.candidate.statusHeader"}}</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#each specialistRows}}
+        <tr data-candidate-id="{{id}}" class="status-{{status}}">
+          <td data-tooltip="{{appearanceTip}}">{{name}}{{#if isAggregate}} ×{{quantity}}{{/if}}</td>
+          <td>{{age}}</td>
+          <td>{{cultureLabel}}</td>
+          <td>{{identityLine}}</td>
+          <td>{{#if wageGp}}{{wageGp}} gp/{{wageUnit}}{{/if}}</td>
+          <td>{{statusLabel}}</td>
+          <td class="row-actions">
+            {{#if isAvailable}}
+            <a data-action="recruit" data-tooltip="{{localize 'ACKS-HENCHMEN.candidate.recruit'}}"><i class="fas fa-handshake"></i></a>
+            {{/if}}
+            {{#if @root.isGM}}
+            <a data-action="removeCandidate" data-tooltip="{{localize 'ACKS-HENCHMEN.candidate.remove'}}"><i class="fas fa-trash"></i></a>
+            {{/if}}
+          </td>
+        </tr>
+        {{/each}}
+      </tbody>
+    </table>
+    {{/if}}
     {{else}}
     <p class="hint">{{localize "ACKS-HENCHMEN.candidate.none"}}</p>
     {{/if}}
