@@ -375,3 +375,12 @@ acksHenchmen.recruitMonster(monster, employer, { captured });`
     ),
   ];
 }
+
+/**
+ * Pack contract for the synced tools/build-packs.mjs harness (see
+ * acks-module-template): pack name -> document builder.
+ */
+export const packs = {
+  "proficiencies-powers": buildProficienciesPowers,
+  macros: buildMacros,
+};
