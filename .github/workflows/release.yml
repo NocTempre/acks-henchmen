@@ -1,0 +1,83 @@
+name: Release
+
+# Cut a release by pushing a version tag, e.g.:
+#   git tag v0.1.0 && git push origin v0.1.0
+# This builds module.zip and attaches module.json + module.zip to the GitHub
+# release, which the manifest URL below resolves to:
+#   https://github.com/NocTempre/acks-henchmen/releases/latest/download/module.json
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Verify tag matches module.json version
+        run: |
+          MANIFEST_VERSION=$(node -p "require('./module.json').version")
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          echo "manifest=$MANIFEST_VERSION  tag=$TAG_VERSION"
+          if [ "$MANIFEST_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::module.json version ($MANIFEST_VERSION) does not match tag ($TAG_VERSION)"
+            exit 1
+          fi
+
+      - name: Build compendium packs
+        run: |
+          npm install
+          npm run build:packs
+
+      - name: Validate scripts, templates, and JSON
+        run: npm run validate
+
+      - name: Verify every declared pack exists
+        run: |
+          node -e '
+            const fs = require("fs");
+            const m = require("./module.json");
+            let missing = false;
+            for (const p of m.packs ?? []) {
+              if (!fs.existsSync(p.path + "/CURRENT")) {
+                console.error(`::error::declared pack "${p.name}" is missing its compiled LevelDB at ${p.path}`);
+                missing = true;
+              }
+            }
+            if (missing) process.exit(1);
+          '
+
+      - name: Create module.zip
+        run: |
+          # Ship compiled packs (packs/*) but not the JSON sources (packs/_source).
+          # ruledata/ MUST ship: the module fetches it at runtime.
+          zip -r module.zip \
+            module.json \
+            scripts \
+            templates \
+            styles \
+            lang \
+            ruledata \
+            packs \
+            README.md \
+            docs \
+            -x 'packs/_source/*'
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            module.json
+            module.zip

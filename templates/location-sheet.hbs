@@ -1,0 +1,184 @@
+<div class="location-sheet-body">
+  <header class="location-header">
+    <img class="profile" src="{{actor.img}}" data-edit="img" alt="{{actor.name}}" />
+    <div class="header-fields">
+      <input class="location-name" name="name" type="text" value="{{actor.name}}" placeholder="{{localize 'ACKS-HENCHMEN.location.name'}}" />
+      <div class="market-class-line">
+        <span class="market-class-badge" data-tooltip="{{marketClassSource}}">
+          {{localize "ACKS-HENCHMEN.location.marketClass"}}: <strong>{{marketClassRoman}}</strong>
+        </span>
+        {{#if isGM}}
+        <button type="button" data-action="processNow" data-tooltip="{{localize 'ACKS-HENCHMEN.location.processNowHint'}}">
+          <i class="fas fa-rotate"></i> {{localize "ACKS-HENCHMEN.location.processNow"}}
+        </button>
+        <button type="button" data-action="advanceWeek" data-tooltip="{{localize 'ACKS-HENCHMEN.location.advanceWeekHint'}}">
+          <i class="fas fa-forward"></i> {{localize "ACKS-HENCHMEN.location.advanceWeek"}}
+        </button>
+        {{/if}}
+      </div>
+    </div>
+  </header>
+
+  <details class="section" open>
+    <summary>{{localize "ACKS-HENCHMEN.location.settings"}}</summary>
+    <div class="grid-2">
+      <div class="form-group">
+        <label>{{localize "ACKS-HENCHMEN.location.region"}}</label>
+        <input type="text" name="system.region" value="{{system.region}}" />
+      </div>
+      <div class="form-group">
+        <label>{{localize "ACKS-HENCHMEN.location.urbanFamilies"}}</label>
+        <input type="number" name="system.urbanFamilies" value="{{system.urbanFamilies}}" min="0" step="1" />
+      </div>
+      <div class="form-group">
+        <label data-tooltip="{{localize 'ACKS-HENCHMEN.location.overrideHint'}}">{{localize "ACKS-HENCHMEN.location.override"}}</label>
+        <select name="system.marketClassOverride">
+          <option value="" {{#unless system.marketClassOverride}}selected{{/unless}}>{{localize "ACKS-HENCHMEN.location.noOverride"}}</option>
+          <option value="1" {{#if (eq system.marketClassOverride 1)}}selected{{/if}}>I</option>
+          <option value="2" {{#if (eq system.marketClassOverride 2)}}selected{{/if}}>II</option>
+          <option value="3" {{#if (eq system.marketClassOverride 3)}}selected{{/if}}>III</option>
+          <option value="4" {{#if (eq system.marketClassOverride 4)}}selected{{/if}}>IV</option>
+          <option value="5" {{#if (eq system.marketClassOverride 5)}}selected{{/if}}>V</option>
+          <option value="6" {{#if (eq system.marketClassOverride 6)}}selected{{/if}}>VI</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>{{localize "ACKS-HENCHMEN.location.rarityTable"}}</label>
+        <select name="system.classRarityTableId">
+          {{#each rarityVariants}}
+          <option value="{{id}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+          {{/each}}
+        </select>
+      </div>
+      <div class="form-group">
+        <label data-tooltip="{{localize 'ACKS-HENCHMEN.location.desertHint'}}">{{localize "ACKS-HENCHMEN.location.desert"}}</label>
+        <input type="checkbox" name="system.desertRealm" {{#if system.desertRealm}}checked{{/if}} />
+      </div>
+    </div>
+  </details>
+
+  <details class="section" open>
+    <summary>
+      {{localize "ACKS-HENCHMEN.location.postings"}} ({{postings.length}})
+      {{#if isGM}}
+      <button type="button" class="inline-add" data-action="createPosting"><i class="fas fa-plus"></i> {{localize "ACKS-HENCHMEN.posting.create"}}</button>
+      {{/if}}
+    </summary>
+    {{#if postings.length}}
+    <table class="postings-table">
+      <thead>
+        <tr>
+          <th>{{localize "ACKS-HENCHMEN.posting.spec"}}</th>
+          <th data-tooltip="{{localize 'ACKS-HENCHMEN.posting.weekHint'}}">{{localize "ACKS-HENCHMEN.posting.week"}}</th>
+          <th data-tooltip="{{localize 'ACKS-HENCHMEN.posting.poolHint'}}">{{localize "ACKS-HENCHMEN.posting.pool"}}</th>
+          <th>{{localize "ACKS-HENCHMEN.posting.available"}}</th>
+          <th>{{localize "ACKS-HENCHMEN.posting.fees"}}</th>
+          <th>{{localize "ACKS-HENCHMEN.posting.statusHeader"}}</th>
+          {{#if isGM}}<th></th>{{/if}}
+        </tr>
+      </thead>
+      <tbody>
+        {{#each postings}}
+        <tr data-posting-id="{{id}}" class="{{#unless isActive}}inactive{{/unless}}">
+          <td data-tooltip="{{rollDetail}}">{{specLabel}}{{#if commissioned}} <i class="fas fa-scroll" data-tooltip="{{localize 'ACKS-HENCHMEN.posting.commissioned'}}"></i>{{/if}}</td>
+          <td>{{week}}</td>
+          <td>{{totalAvailable}}</td>
+          <td>{{availableCount}}{{#if pendingCount}} <span class="hint">(+{{pendingCount}})</span>{{/if}}</td>
+          <td>{{feesTotal}} gp</td>
+          <td>{{statusLabel}}</td>
+          {{#if @root.isGM}}
+          <td class="row-actions">
+            <a data-action="togglePlayerDetails" data-tooltip="{{localize 'ACKS-HENCHMEN.posting.toggleDetails'}}"><i class="fas {{#if playersSeeDetails}}fa-eye{{else}}fa-eye-slash{{/if}}"></i></a>
+            {{#if isActive}}
+            <a data-action="renewPosting" data-tooltip="{{localize 'ACKS-HENCHMEN.posting.renew'}}"><i class="fas fa-repeat"></i></a>
+            <a data-action="closePosting" data-tooltip="{{localize 'ACKS-HENCHMEN.posting.close'}}"><i class="fas fa-xmark"></i></a>
+            {{/if}}
+          </td>
+          {{/if}}
+        </tr>
+        {{/each}}
+      </tbody>
+    </table>
+    {{else}}
+    <p class="hint">{{localize "ACKS-HENCHMEN.posting.none"}}</p>
+    {{/if}}
+  </details>
+
+  <details class="section" open>
+    <summary>{{localize "ACKS-HENCHMEN.location.candidates"}} ({{candidates.length}})</summary>
+    {{#if candidates.length}}
+    <table class="candidates-table">
+      <thead>
+        <tr>
+          <th>{{localize "ACKS-HENCHMEN.candidate.name"}}</th>
+          <th>{{localize "ACKS-HENCHMEN.candidate.qty"}}</th>
+          <th>{{localize "ACKS-HENCHMEN.candidate.levelClass"}}</th>
+          <th>{{localize "ACKS-HENCHMEN.candidate.stats"}}</th>
+          <th>{{localize "ACKS-HENCHMEN.candidate.wage"}}</th>
+          <th>{{localize "ACKS-HENCHMEN.candidate.statusHeader"}}</th>
+          {{#if isGM}}<th></th>{{/if}}
+        </tr>
+      </thead>
+      <tbody>
+        {{#each candidates}}
+        <tr data-candidate-id="{{id}}" class="status-{{status}}">
+          <td>{{name}}</td>
+          <td>{{quantity}}</td>
+          <td>{{#if level}}L{{level}}{{/if}} {{classKey}}{{#if template}} ({{template}}){{/if}}</td>
+          <td>{{statLine}}</td>
+          <td>{{#if wageGp}}{{wageGp}} gp/{{wageUnit}}{{/if}}</td>
+          <td>{{statusLabel}}</td>
+          {{#if @root.isGM}}
+          <td class="row-actions">
+            {{#if rollable}}
+            <a data-action="rollStats" data-tooltip="{{localize 'ACKS-HENCHMEN.candidate.rollStats'}}"><i class="fas fa-dice-six"></i></a>
+            <a data-action="rollClass" data-tooltip="{{localize 'ACKS-HENCHMEN.candidate.rollClass'}}"><i class="fas fa-hat-wizard"></i></a>
+            <a data-action="rollLevel" data-tooltip="{{localize 'ACKS-HENCHMEN.candidate.rollLevel'}}"><i class="fas fa-arrow-up-1-9"></i></a>
+            {{/if}}
+            {{#if isAvailable}}
+            <a data-action="recruit" data-tooltip="{{localize 'ACKS-HENCHMEN.candidate.recruit'}}"><i class="fas fa-handshake"></i></a>
+            {{/if}}
+            <a data-action="removeCandidate" data-tooltip="{{localize 'ACKS-HENCHMEN.candidate.remove'}}"><i class="fas fa-trash"></i></a>
+          </td>
+          {{/if}}
+        </tr>
+        {{/each}}
+      </tbody>
+    </table>
+    {{else}}
+    <p class="hint">{{localize "ACKS-HENCHMEN.candidate.none"}}</p>
+    {{/if}}
+  </details>
+
+  <details class="section">
+    <summary>
+      {{localize "ACKS-HENCHMEN.location.slander"}} ({{slander.length}})
+      {{#if isGM}}<button type="button" class="inline-add" data-action="addSlander"><i class="fas fa-plus"></i></button>{{/if}}
+    </summary>
+    <p class="hint">{{localize "ACKS-HENCHMEN.location.slanderHint"}}</p>
+    {{#each slander}}
+    <div class="slander-row" data-slander-index="{{index}}">
+      <input type="text" name="system.slander.{{index}}.partyKey" value="{{partyKey}}" placeholder="{{localize 'ACKS-HENCHMEN.location.slanderParty'}}" />
+      <input type="text" name="system.slander.{{index}}.npcName" value="{{npcName}}" placeholder="{{localize 'ACKS-HENCHMEN.location.slanderNpc'}}" />
+      <input type="text" name="system.slander.{{index}}.note" value="{{note}}" placeholder="{{localize 'ACKS-HENCHMEN.location.slanderNote'}}" />
+      {{#if @root.isGM}}<a data-action="removeSlander"><i class="fas fa-trash"></i></a>{{/if}}
+    </div>
+    {{/each}}
+  </details>
+
+  <details class="section">
+    <summary>{{localize "ACKS-HENCHMEN.location.ledger"}} ({{ledgerTotal}} gp)</summary>
+    <table class="ledger-table">
+      <tbody>
+        {{#each ledger}}
+        <tr><td>{{gp}} gp</td><td>{{postingId}}</td></tr>
+        {{/each}}
+      </tbody>
+    </table>
+  </details>
+
+  <details class="section">
+    <summary>{{localize "ACKS-HENCHMEN.location.notesHeader"}}</summary>
+    <textarea name="system.notes" rows="4">{{system.notes}}</textarea>
+  </details>
+</div>

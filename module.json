@@ -1,0 +1,69 @@
+{
+  "id": "acks-henchmen",
+  "title": "ACKS II — Henchmen & Hirelings",
+  "description": "Completes the ACKS II hireling ruleset: market-class availability rolling, recruitment postings with time tracking, a player-facing recruitment board, hiring negotiation (Reaction to Hiring Offer), henchman stat/class/level rolling with recorded results, loyalty & morale automation (calamities, level-up loyalty rolls, obedience, wages), monstrous henchmen, followers, and optional slavery rules. Modifiers are data-driven: Active Effects on proficiency/power items feed every roll.",
+  "version": "0.1.0",
+  "socket": true,
+  "compatibility": {
+    "minimum": "13",
+    "verified": "14.364"
+  },
+  "authors": [
+    {
+      "name": "NocTempre"
+    }
+  ],
+  "esmodules": ["scripts/module.mjs"],
+  "styles": ["styles/acks-henchmen.css"],
+  "languages": [
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "lang/en.json"
+    }
+  ],
+  "documentTypes": {
+    "Actor": {
+      "location": {
+        "htmlFields": ["notes"]
+      }
+    }
+  },
+  "packs": [
+    {
+      "name": "proficiencies-powers",
+      "label": "ACKS Henchmen Proficiencies & Powers",
+      "path": "packs/proficiencies-powers",
+      "type": "Item",
+      "system": "acks",
+      "ownership": {
+        "PLAYER": "OBSERVER",
+        "ASSISTANT": "OWNER"
+      }
+    },
+    {
+      "name": "macros",
+      "label": "ACKS Henchmen Macros",
+      "path": "packs/macros",
+      "type": "Macro",
+      "ownership": {
+        "PLAYER": "OBSERVER",
+        "ASSISTANT": "OWNER"
+      }
+    }
+  ],
+  "relationships": {
+    "systems": [
+      {
+        "id": "acks",
+        "type": "system",
+        "compatibility": {
+          "minimum": "13"
+        }
+      }
+    ]
+  },
+  "url": "https://github.com/NocTempre/acks-henchmen",
+  "manifest": "https://github.com/NocTempre/acks-henchmen/releases/latest/download/module.json",
+  "download": "https://github.com/NocTempre/acks-henchmen/releases/latest/download/module.zip"
+}

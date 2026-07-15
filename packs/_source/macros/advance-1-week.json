@@ -1,0 +1,9 @@
+{
+  "_id": "19c7d573cdb117e5",
+  "_key": "!macros!19c7d573cdb117e5",
+  "name": "Advance 1 Week",
+  "type": "script",
+  "scope": "global",
+  "img": "icons/svg/clockwork.svg",
+  "command": "acksHenchmen.time.advanceDays(7);"
+}

@@ -1,0 +1,49 @@
+{
+  "_id": "4d7fbced74f3a47a",
+  "_key": "!items!4d7fbced74f3a47a",
+  "name": "Diplomacy",
+  "type": "ability",
+  "img": "icons/svg/book.svg",
+  "system": {
+    "description": "<p>Smooth-tongued and familiar with protocol: +1 to reaction rolls when parleying. Stacks with Mystic Aura, not with Intimidation or Seduction. (RR 108)</p>",
+    "proficiencytype": "general",
+    "favorite": false,
+    "pattern": "white",
+    "requirements": "",
+    "roll": "",
+    "rollType": "result",
+    "rollTarget": 0,
+    "blindroll": false,
+    "save": "",
+    "_schemaVersion": 3
+  },
+  "effects": [
+    {
+      "_id": "cba5bc01951106dd",
+      "_key": "!items.effects!4d7fbced74f3a47a.cba5bc01951106dd",
+      "name": "Diplomacy",
+      "type": "base",
+      "img": "icons/svg/aura.svg",
+      "system": {},
+      "transfer": true,
+      "disabled": false,
+      "changes": [
+        {
+          "priority": 20,
+          "key": "flags.acks-henchmen.hiring",
+          "mode": 2,
+          "value": "1"
+        }
+      ],
+      "duration": {
+        "startTime": null,
+        "seconds": null
+      },
+      "flags": {
+        "acks-henchmen": {
+          "condition": "ACKS-HENCHMEN.cond.parley"
+        }
+      }
+    }
+  ]
+}

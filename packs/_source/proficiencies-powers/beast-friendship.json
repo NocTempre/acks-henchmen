@@ -1,0 +1,56 @@
+{
+  "_id": "6d834e47d8fb77cd",
+  "_key": "!items!6d834e47d8fb77cd",
+  "name": "Beast Friendship",
+  "type": "ability",
+  "img": "icons/svg/book.svg",
+  "system": {
+    "description": "<p>Schooled in the natural world: identifies plants and fauna (11+), understands animal vocalizations, +2 to reaction rolls with normal animals, and can take animals as henchmen. With Friend of Birds and Beasts: +1 henchman limit while at least one henchman is an animal. (RR 106)</p>",
+    "proficiencytype": "class",
+    "favorite": false,
+    "pattern": "white",
+    "requirements": "",
+    "roll": "",
+    "rollType": "result",
+    "rollTarget": 0,
+    "blindroll": false,
+    "save": "",
+    "_schemaVersion": 3
+  },
+  "effects": [
+    {
+      "_id": "906d3caea5f97da1",
+      "_key": "!items.effects!6d834e47d8fb77cd.906d3caea5f97da1",
+      "name": "Beast Friendship — animal reactions",
+      "type": "base",
+      "img": "icons/svg/aura.svg",
+      "system": {},
+      "transfer": true,
+      "disabled": false,
+      "changes": [
+        {
+          "priority": 20,
+          "key": "flags.acks-henchmen.hiring",
+          "mode": 2,
+          "value": "2"
+        },
+        {
+          "priority": 20,
+          "key": "flags.acks-henchmen.recruitKinds",
+          "mode": 0,
+          "value": "animal"
+        }
+      ],
+      "duration": {
+        "startTime": null,
+        "seconds": null
+      },
+      "flags": {
+        "acks-henchmen": {
+          "condition": "ACKS-HENCHMEN.cond.animals",
+          "target": "ACKS-HENCHMEN.target.animals"
+        }
+      }
+    }
+  ]
+}

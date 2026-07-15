@@ -1,0 +1,47 @@
+{
+  "_id": "b159f25c5ad07983",
+  "_key": "!items!b159f25c5ad07983",
+  "name": "Leadership",
+  "type": "ability",
+  "img": "icons/svg/book.svg",
+  "system": {
+    "description": "<p>An inspirational authority figure: may hire one more henchman than Charisma would otherwise permit; the base morale of any ruled domain increases by 1. (RR 114)</p>",
+    "proficiencytype": "general",
+    "favorite": false,
+    "pattern": "white",
+    "requirements": "",
+    "roll": "",
+    "rollType": "result",
+    "rollTarget": 0,
+    "blindroll": false,
+    "save": "",
+    "_schemaVersion": 3
+  },
+  "effects": [
+    {
+      "_id": "d54a19dcb2a483d9",
+      "_key": "!items.effects!b159f25c5ad07983.d54a19dcb2a483d9",
+      "name": "Leadership",
+      "type": "base",
+      "img": "icons/svg/aura.svg",
+      "system": {},
+      "transfer": true,
+      "disabled": false,
+      "changes": [
+        {
+          "priority": 20,
+          "key": "flags.acks-henchmen.retainBonus",
+          "mode": 2,
+          "value": "1"
+        }
+      ],
+      "duration": {
+        "startTime": null,
+        "seconds": null
+      },
+      "flags": {
+        "acks-henchmen": {}
+      }
+    }
+  ]
+}

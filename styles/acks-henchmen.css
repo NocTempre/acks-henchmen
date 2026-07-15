@@ -1,0 +1,228 @@
+/* ACKS II — Henchmen & Hirelings */
+
+/* ------------------------------ dialogs ------------------------------ */
+.acks-henchmen.throw-dialog .throw-dialog-body,
+.acks-henchmen.posting-dialog .posting-dialog-body {
+  padding: 0.5rem;
+}
+
+.acks-henchmen .form-group.modifier {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.25rem 0;
+}
+
+.acks-henchmen .form-group.modifier label {
+  flex: 1;
+}
+
+.acks-henchmen .form-group.modifier .mod-value {
+  font-weight: bold;
+  min-width: 4.5em;
+  text-align: right;
+}
+
+.acks-henchmen .form-group.modifier input[type="number"],
+.acks-henchmen .form-group.modifier select {
+  max-width: 10em;
+}
+
+.acks-henchmen .form-group.modifier.locked label {
+  opacity: 0.8;
+}
+
+.acks-henchmen .throw-total {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.05em;
+}
+
+.acks-henchmen .throw-total .gm-unlock {
+  margin-left: auto;
+  opacity: 0.6;
+}
+
+.acks-henchmen .secret-badge {
+  margin-left: 0.5rem;
+  padding: 0 0.4em;
+  border: 1px solid var(--color-border-dark-tertiary, #7a7971);
+  border-radius: 3px;
+  font-size: 0.85em;
+}
+
+.acks-henchmen .hint {
+  color: var(--color-text-dark-secondary, #4b4a44);
+  font-size: 0.9em;
+}
+
+/* ------------------------------ chat cards ------------------------------ */
+.acks-henchmen-card {
+  border: 1px solid var(--color-border-dark-tertiary, #7a7971);
+  border-radius: 4px;
+  padding: 0.35rem 0.5rem;
+}
+
+.acks-henchmen-card .card-header h3 {
+  margin: 0 0 0.25rem;
+  border-bottom: 1px solid var(--color-border-light-tertiary, #b5b3a4);
+  font-size: 1.05em;
+}
+
+.acks-henchmen-card .roll-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.acks-henchmen-card .mod-parts {
+  margin: 0.25rem 0;
+  padding: 0 0 0 1rem;
+  font-size: 0.9em;
+}
+
+.acks-henchmen-card .mod-parts li {
+  display: flex;
+  justify-content: space-between;
+}
+
+.acks-henchmen-card .outcome {
+  margin-top: 0.25rem;
+  padding: 0.25rem 0.4rem;
+  border-left: 3px solid var(--color-border-highlight, #ff6400);
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.acks-henchmen-card.secret {
+  border-style: dashed;
+}
+
+.acks-henchmen-card .card-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.35rem;
+}
+
+/* ------------------------------ location sheet ------------------------------ */
+.acks-henchmen.location-sheet .location-sheet-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  overflow-y: auto;
+  height: 100%;
+}
+
+.acks-henchmen.location-sheet .location-header {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.acks-henchmen.location-sheet .location-header img.profile {
+  width: 64px;
+  height: 64px;
+  border: none;
+  object-fit: cover;
+}
+
+.acks-henchmen.location-sheet .header-fields {
+  flex: 1;
+}
+
+.acks-henchmen.location-sheet input.location-name {
+  width: 100%;
+  font-size: 1.4em;
+  font-weight: bold;
+  border: none;
+  background: transparent;
+}
+
+.acks-henchmen.location-sheet .market-class-line {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.acks-henchmen.location-sheet .market-class-badge {
+  padding: 0.1em 0.5em;
+  border: 1px solid var(--color-border-dark-tertiary, #7a7971);
+  border-radius: 3px;
+}
+
+.acks-henchmen.location-sheet details.section {
+  border: 1px solid var(--color-border-light-tertiary, #b5b3a4);
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+}
+
+.acks-henchmen.location-sheet details.section > summary {
+  cursor: pointer;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.acks-henchmen.location-sheet .inline-add {
+  margin-left: auto;
+  width: auto;
+  line-height: 1.4;
+  font-size: 0.85em;
+}
+
+.acks-henchmen.location-sheet .grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.25rem 1rem;
+}
+
+.acks-henchmen.location-sheet table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92em;
+}
+
+.acks-henchmen.location-sheet th {
+  text-align: left;
+  border-bottom: 1px solid var(--color-border-dark-tertiary, #7a7971);
+}
+
+.acks-henchmen.location-sheet td {
+  padding: 0.15rem 0.25rem;
+  vertical-align: middle;
+}
+
+.acks-henchmen.location-sheet tr.inactive,
+.acks-henchmen.location-sheet tr.status-withdrawn,
+.acks-henchmen.location-sheet tr.status-refused {
+  opacity: 0.55;
+}
+
+.acks-henchmen.location-sheet tr.status-slandered {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+
+.acks-henchmen.location-sheet tr.status-hired {
+  opacity: 0.7;
+  font-style: italic;
+}
+
+.acks-henchmen.location-sheet .row-actions {
+  white-space: nowrap;
+}
+
+.acks-henchmen.location-sheet .row-actions a {
+  margin: 0 0.15rem;
+}
+
+.acks-henchmen.location-sheet .slander-row {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+  margin: 0.15rem 0;
+}

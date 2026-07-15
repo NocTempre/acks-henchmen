@@ -1,0 +1,9 @@
+{
+  "_id": "7282dfd944451d6d",
+  "_key": "!macros!7282dfd944451d6d",
+  "name": "Open Recruitment Board",
+  "type": "script",
+  "scope": "global",
+  "img": "icons/svg/tavern.svg",
+  "command": "const locations = game.actors.filter((a) => a.type === \"acks-henchmen.location\");\nif (!locations.length) return ui.notifications.warn(\"Create a Location actor first.\");\n(locations.find((l) => l.testUserPermission(game.user, \"OBSERVER\")) ?? locations[0]).sheet.render(true);"
+}

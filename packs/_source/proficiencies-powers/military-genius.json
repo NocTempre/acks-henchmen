@@ -1,0 +1,49 @@
+{
+  "_id": "b8f0d043f340a7f6",
+  "_key": "!items!b8f0d043f340a7f6",
+  "name": "Military Genius",
+  "type": "ability",
+  "img": "icons/svg/book.svg",
+  "system": {
+    "description": "<p>Commands the battlefield like a god of war: permanent +1 to strategic ability, leadership ability, and morale modifier when commanding troops. (JJ powers — Chosen)</p>",
+    "proficiencytype": "class",
+    "favorite": false,
+    "pattern": "white",
+    "requirements": "",
+    "roll": "",
+    "rollType": "result",
+    "rollTarget": 0,
+    "blindroll": false,
+    "save": "",
+    "_schemaVersion": 3
+  },
+  "effects": [
+    {
+      "_id": "7aed57b4174e93e0",
+      "_key": "!items.effects!b8f0d043f340a7f6.7aed57b4174e93e0",
+      "name": "Military Genius",
+      "type": "base",
+      "img": "icons/svg/aura.svg",
+      "system": {},
+      "transfer": true,
+      "disabled": false,
+      "changes": [
+        {
+          "priority": 20,
+          "key": "flags.acks-henchmen.henchmanMorale",
+          "mode": 2,
+          "value": "1"
+        }
+      ],
+      "duration": {
+        "startTime": null,
+        "seconds": null
+      },
+      "flags": {
+        "acks-henchmen": {
+          "condition": "ACKS-HENCHMEN.cond.commanding"
+        }
+      }
+    }
+  ]
+}

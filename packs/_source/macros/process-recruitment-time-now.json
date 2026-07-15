@@ -1,0 +1,9 @@
+{
+  "_id": "6819babde4e06653",
+  "_key": "!macros!6819babde4e06653",
+  "name": "Process Recruitment Time Now",
+  "type": "script",
+  "scope": "global",
+  "img": "icons/svg/regen.svg",
+  "command": "acksHenchmen.processAllLocations().then(() => ui.notifications.info(\"Recruitment postings processed.\"));"
+}

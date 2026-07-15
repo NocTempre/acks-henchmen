@@ -1,0 +1,49 @@
+{
+  "_id": "53db0fa74bab47cf",
+  "_key": "!items!53db0fa74bab47cf",
+  "name": "Intimidation",
+  "type": "ability",
+  "img": "icons/svg/book.svg",
+  "system": {
+    "description": "<p>Bullies others: +1 to reaction rolls when implicitly or explicitly threatening; targets must be under 5 HD or outnumbered/outranked. Stacks with Mystic Aura, not with Diplomacy or Seduction. (RR 113)</p>",
+    "proficiencytype": "general",
+    "favorite": false,
+    "pattern": "white",
+    "requirements": "",
+    "roll": "",
+    "rollType": "result",
+    "rollTarget": 0,
+    "blindroll": false,
+    "save": "",
+    "_schemaVersion": 3
+  },
+  "effects": [
+    {
+      "_id": "bedac0313fa1713a",
+      "_key": "!items.effects!53db0fa74bab47cf.bedac0313fa1713a",
+      "name": "Intimidation",
+      "type": "base",
+      "img": "icons/svg/aura.svg",
+      "system": {},
+      "transfer": true,
+      "disabled": false,
+      "changes": [
+        {
+          "priority": 20,
+          "key": "flags.acks-henchmen.hiring",
+          "mode": 2,
+          "value": "1"
+        }
+      ],
+      "duration": {
+        "startTime": null,
+        "seconds": null
+      },
+      "flags": {
+        "acks-henchmen": {
+          "condition": "ACKS-HENCHMEN.cond.threats"
+        }
+      }
+    }
+  ]
+}

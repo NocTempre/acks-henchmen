@@ -1,0 +1,49 @@
+{
+  "_id": "753729a3bffdb00d",
+  "_key": "!items!753729a3bffdb00d",
+  "name": "Dark Charisma",
+  "type": "ability",
+  "img": "icons/svg/book.svg",
+  "system": {
+    "description": "<p>Chaotic characters or monsters in the character's service gain +1 to their morale score whenever he personally leads them. (JJ powers — Zaharan Ruinguard)</p>",
+    "proficiencytype": "class",
+    "favorite": false,
+    "pattern": "white",
+    "requirements": "",
+    "roll": "",
+    "rollType": "result",
+    "rollTarget": 0,
+    "blindroll": false,
+    "save": "",
+    "_schemaVersion": 3
+  },
+  "effects": [
+    {
+      "_id": "4a70a3b28761d0ef",
+      "_key": "!items.effects!753729a3bffdb00d.4a70a3b28761d0ef",
+      "name": "Dark Charisma",
+      "type": "base",
+      "img": "icons/svg/aura.svg",
+      "system": {},
+      "transfer": true,
+      "disabled": false,
+      "changes": [
+        {
+          "priority": 20,
+          "key": "flags.acks-henchmen.henchmanMorale",
+          "mode": 2,
+          "value": "1"
+        }
+      ],
+      "duration": {
+        "startTime": null,
+        "seconds": null
+      },
+      "flags": {
+        "acks-henchmen": {
+          "condition": "ACKS-HENCHMEN.cond.chaoticServants"
+        }
+      }
+    }
+  ]
+}
