@@ -45,6 +45,7 @@ function postingField() {
       specialistType: str(),
     }),
     commissioned: new fields.BooleanField({ initial: false }),
+    renew: new fields.BooleanField({ initial: false }), // roll a fresh pool at month end
     totalAvailable: int(0),
     rollDetail: str(),
     arrivalPlan: new fields.ArrayField(

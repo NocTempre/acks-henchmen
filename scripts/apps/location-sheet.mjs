@@ -145,6 +145,26 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     return detail ? `${kind}: ${detail}` : kind;
   }
 
+  /**
+   * Form arrays: the slander rows render as indexed inputs
+   * (system.slander.0.partyKey…), which expandObject turns into a
+   * numeric-keyed object that ArrayField rejects. Rebuild the array, merging
+   * over the stored rows so non-input fields (time) survive.
+   * @override
+   */
+  _prepareSubmitData(event, form, formData, updateData) {
+    const data = super._prepareSubmitData(event, form, formData, updateData);
+    const submitted = foundry.utils.getProperty(data, "system.slander");
+    if (submitted && !Array.isArray(submitted)) {
+      const existing = (this.actor.system.slander ?? []).map((s) => s.toObject?.() ?? s);
+      const merged = Object.entries(submitted)
+        .sort(([a], [b]) => Number(a) - Number(b))
+        .map(([index, row]) => ({ ...(existing[Number(index)] ?? {}), ...row }));
+      foundry.utils.setProperty(data, "system.slander", merged);
+    }
+    return data;
+  }
+
   #posting(target) {
     const id = target.closest("[data-posting-id]")?.dataset.postingId;
     return (this.actor.system.postings ?? []).find((p) => p.id === id);
