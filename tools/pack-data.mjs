@@ -345,6 +345,25 @@ acksHenchmen.openThrowDialog("hirelingObedience", {
 });`
     ),
     macro(
+      "Generate Followers (Selected)",
+      "icons/svg/castle.svg",
+      `const actor = canvas.tokens.controlled[0]?.actor ?? game.user.character;
+if (!actor) return ui.notifications.warn("Select a 9th+ level character token first.");
+acksHenchmen.openFollowersDialog(actor);`
+    ),
+    macro(
+      "Recruit Monster (Targeted)",
+      "icons/svg/pawprint.svg",
+      `const employer = canvas.tokens.controlled[0]?.actor ?? game.user.character;
+const monster = game.user.targets.first()?.actor;
+if (!employer || !monster) return ui.notifications.warn("Select your character's token and TARGET the monster.");
+const captured = await foundry.applications.api.DialogV2.confirm({
+  window: { title: "Recruit " + monster.name },
+  content: "<p>Was the monster defeated and captured (Irrefusable Offer, MM 351)? Choose No for a peaceful/market offer.</p>",
+});
+acksHenchmen.recruitMonster(monster, employer, { captured });`
+    ),
+    macro(
       "Advance 1 Week",
       "icons/svg/clockwork.svg",
       `acksHenchmen.time.advanceDays(7);`

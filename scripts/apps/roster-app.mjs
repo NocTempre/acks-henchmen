@@ -1,4 +1,4 @@
-/* global game, ui, foundry */
+/* global game, ui, foundry, Hooks */
 /**
  * RosterApp — an employer's merged hireling roster: core henchmenList plus
  * the module's monster-henchman list, with the 4+CHA(+effects) limit meter,

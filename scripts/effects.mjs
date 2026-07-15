@@ -1,4 +1,4 @@
-/* global game */
+/* global game, foundry */
 /**
  * Modifier discovery — the heart of the module's data-driven design.
  *
