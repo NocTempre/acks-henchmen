@@ -1,6 +1,6 @@
 {
-  "_id": "bf7700e360422663",
-  "_key": "!items!bf7700e360422663",
+  "_id": "acksHmbf7700e360",
+  "_key": "!items!acksHmbf7700e360",
   "name": "Seduction",
   "type": "ability",
   "img": "icons/svg/book.svg",
@@ -19,8 +19,8 @@
   },
   "effects": [
     {
-      "_id": "8f1c14dead131fe8",
-      "_key": "!items.effects!bf7700e360422663.8f1c14dead131fe8",
+      "_id": "acksHm8f1c14dead",
+      "_key": "!items.effects!acksHmbf7700e360.acksHm8f1c14dead",
       "name": "Seduction",
       "type": "base",
       "img": "icons/svg/aura.svg",

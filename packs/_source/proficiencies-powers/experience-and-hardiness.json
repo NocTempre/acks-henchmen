@@ -1,6 +1,6 @@
 {
-  "_id": "93f901d8543eb2c6",
-  "_key": "!items!93f901d8543eb2c6",
+  "_id": "acksHm93f901d854",
+  "_key": "!items!acksHm93f901d854",
   "name": "Experience and Hardiness",
   "type": "ability",
   "img": "icons/svg/book.svg",
@@ -19,8 +19,8 @@
   },
   "effects": [
     {
-      "_id": "665d6038a4bd4cb2",
-      "_key": "!items.effects!93f901d8543eb2c6.665d6038a4bd4cb2",
+      "_id": "acksHm665d6038a4",
+      "_key": "!items.effects!acksHm93f901d854.acksHm665d6038a4",
       "name": "Experience and Hardiness",
       "type": "base",
       "img": "icons/svg/aura.svg",

@@ -1,6 +1,6 @@
 {
-  "_id": "4d7fbced74f3a47a",
-  "_key": "!items!4d7fbced74f3a47a",
+  "_id": "acksHm4d7fbced74",
+  "_key": "!items!acksHm4d7fbced74",
   "name": "Diplomacy",
   "type": "ability",
   "img": "icons/svg/book.svg",
@@ -19,8 +19,8 @@
   },
   "effects": [
     {
-      "_id": "cba5bc01951106dd",
-      "_key": "!items.effects!4d7fbced74f3a47a.cba5bc01951106dd",
+      "_id": "acksHmcba5bc0195",
+      "_key": "!items.effects!acksHm4d7fbced74.acksHmcba5bc0195",
       "name": "Diplomacy",
       "type": "base",
       "img": "icons/svg/aura.svg",

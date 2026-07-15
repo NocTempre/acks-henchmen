@@ -1,6 +1,6 @@
 {
-  "_id": "a4c4412aa579eb7a",
-  "_key": "!items!a4c4412aa579eb7a",
+  "_id": "acksHma4c4412aa5",
+  "_key": "!items!acksHma4c4412aa5",
   "name": "Friends of Birds and Beasts",
   "type": "ability",
   "img": "icons/svg/book.svg",
@@ -19,8 +19,8 @@
   },
   "effects": [
     {
-      "_id": "f6a2b89f49d47ee2",
-      "_key": "!items.effects!a4c4412aa579eb7a.f6a2b89f49d47ee2",
+      "_id": "acksHmf6a2b89f49",
+      "_key": "!items.effects!acksHma4c4412aa5.acksHmf6a2b89f49",
       "name": "Friends of Birds and Beasts",
       "type": "base",
       "img": "icons/svg/aura.svg",

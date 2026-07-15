@@ -5,7 +5,7 @@
  * Consumed:
  *  - `flags.acks-influence.reaction` Active Effects already feed hiring
  *    throws (scripts/effects.mjs).
- *  - `acks-influence.rollComplete` → influence rolls made AGAINST a managed
+ *  - `acksInfluenceRollComplete` → influence rolls made AGAINST a managed
  *    hireling are logged into its HenchmanRecord event log.
  *  - `api.open(actor, {modifiers})` → `openInfluenceFor()` opens the roller
  *    with the location's slander penalty pre-injected.
@@ -44,7 +44,7 @@ export function openInfluenceFor(employer, location = null, targetActor = null) 
 export function registerInfluenceIntegration() {
   if (!game.modules.get(INFLUENCE_ID)?.active) return;
   // Log influence rolls targeting managed hirelings into their record.
-  Hooks.on(`${INFLUENCE_ID}.rollComplete`, async ({ actor, target, tone, total, band, newAttitude }) => {
+  Hooks.on("acksInfluenceRollComplete", async ({ actor, target, tone, total, band, newAttitude }) => {
     try {
       if (!target || !adapter.isRetainer(target)) return;
       if (game.user !== game.users.activeGM) return;

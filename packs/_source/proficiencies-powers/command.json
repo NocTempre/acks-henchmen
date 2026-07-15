@@ -1,6 +1,6 @@
 {
-  "_id": "664c3b002e679bd3",
-  "_key": "!items!664c3b002e679bd3",
+  "_id": "acksHm664c3b002e",
+  "_key": "!items!acksHm664c3b002e",
   "name": "Command",
   "type": "ability",
   "img": "icons/svg/book.svg",
@@ -19,8 +19,8 @@
   },
   "effects": [
     {
-      "_id": "e4fb4f2387c7e8a5",
-      "_key": "!items.effects!664c3b002e679bd3.e4fb4f2387c7e8a5",
+      "_id": "acksHme4fb4f2387",
+      "_key": "!items.effects!acksHm664c3b002e.acksHme4fb4f2387",
       "name": "Command",
       "type": "base",
       "img": "icons/svg/aura.svg",

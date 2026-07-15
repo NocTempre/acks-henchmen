@@ -1,6 +1,6 @@
 {
-  "_id": "804e38ef8e772518",
-  "_key": "!items!804e38ef8e772518",
+  "_id": "acksHm804e38ef8e",
+  "_key": "!items!acksHm804e38ef8e",
   "name": "Utter Domination",
   "type": "ability",
   "img": "icons/svg/book.svg",
@@ -19,8 +19,8 @@
   },
   "effects": [
     {
-      "_id": "072d4df322fdc737",
-      "_key": "!items.effects!804e38ef8e772518.072d4df322fdc737",
+      "_id": "acksHm072d4df322",
+      "_key": "!items.effects!acksHm804e38ef8e.acksHm072d4df322",
       "name": "Utter Domination",
       "type": "base",
       "img": "icons/svg/aura.svg",

@@ -1,6 +1,6 @@
 {
-  "_id": "53db0fa74bab47cf",
-  "_key": "!items!53db0fa74bab47cf",
+  "_id": "acksHm53db0fa74b",
+  "_key": "!items!acksHm53db0fa74b",
   "name": "Intimidation",
   "type": "ability",
   "img": "icons/svg/book.svg",
@@ -19,8 +19,8 @@
   },
   "effects": [
     {
-      "_id": "bedac0313fa1713a",
-      "_key": "!items.effects!53db0fa74bab47cf.bedac0313fa1713a",
+      "_id": "acksHmbedac0313f",
+      "_key": "!items.effects!acksHm53db0fa74b.acksHmbedac0313f",
       "name": "Intimidation",
       "type": "base",
       "img": "icons/svg/aura.svg",

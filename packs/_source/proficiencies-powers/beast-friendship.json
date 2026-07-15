@@ -1,6 +1,6 @@
 {
-  "_id": "6d834e47d8fb77cd",
-  "_key": "!items!6d834e47d8fb77cd",
+  "_id": "acksHm6d834e47d8",
+  "_key": "!items!acksHm6d834e47d8",
   "name": "Beast Friendship",
   "type": "ability",
   "img": "icons/svg/book.svg",
@@ -19,8 +19,8 @@
   },
   "effects": [
     {
-      "_id": "906d3caea5f97da1",
-      "_key": "!items.effects!6d834e47d8fb77cd.906d3caea5f97da1",
+      "_id": "acksHm906d3caea5",
+      "_key": "!items.effects!acksHm6d834e47d8.acksHm906d3caea5",
       "name": "Beast Friendship — animal reactions",
       "type": "base",
       "img": "icons/svg/aura.svg",

@@ -1,6 +1,6 @@
 {
-  "_id": "b159f25c5ad07983",
-  "_key": "!items!b159f25c5ad07983",
+  "_id": "acksHmb159f25c5a",
+  "_key": "!items!acksHmb159f25c5a",
   "name": "Leadership",
   "type": "ability",
   "img": "icons/svg/book.svg",
@@ -19,8 +19,8 @@
   },
   "effects": [
     {
-      "_id": "d54a19dcb2a483d9",
-      "_key": "!items.effects!b159f25c5ad07983.d54a19dcb2a483d9",
+      "_id": "acksHmd54a19dcb2",
+      "_key": "!items.effects!acksHmb159f25c5a.acksHmd54a19dcb2",
       "name": "Leadership",
       "type": "base",
       "img": "icons/svg/aura.svg",

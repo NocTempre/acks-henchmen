@@ -1,6 +1,6 @@
 {
-  "_id": "b8f0d043f340a7f6",
-  "_key": "!items!b8f0d043f340a7f6",
+  "_id": "acksHmb8f0d043f3",
+  "_key": "!items!acksHmb8f0d043f3",
   "name": "Military Genius",
   "type": "ability",
   "img": "icons/svg/book.svg",
@@ -19,8 +19,8 @@
   },
   "effects": [
     {
-      "_id": "7aed57b4174e93e0",
-      "_key": "!items.effects!b8f0d043f340a7f6.7aed57b4174e93e0",
+      "_id": "acksHm7aed57b417",
+      "_key": "!items.effects!acksHmb8f0d043f3.acksHm7aed57b417",
       "name": "Military Genius",
       "type": "base",
       "img": "icons/svg/aura.svg",

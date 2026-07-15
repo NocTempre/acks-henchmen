@@ -1,6 +1,6 @@
 {
-  "_id": "dd280c1c77279162",
-  "_key": "!items!dd280c1c77279162",
+  "_id": "acksHmdd280c1c77",
+  "_key": "!items!acksHmdd280c1c77",
   "name": "Battlefield Prowess",
   "type": "ability",
   "img": "icons/svg/book.svg",
@@ -19,8 +19,8 @@
   },
   "effects": [
     {
-      "_id": "0214a94a8ad43314",
-      "_key": "!items.effects!dd280c1c77279162.0214a94a8ad43314",
+      "_id": "acksHm0214a94a8a",
+      "_key": "!items.effects!acksHmdd280c1c77.acksHm0214a94a8a",
       "name": "Battlefield Prowess",
       "type": "base",
       "img": "icons/svg/aura.svg",

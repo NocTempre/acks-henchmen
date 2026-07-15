@@ -8,9 +8,9 @@
  */
 import crypto from "node:crypto";
 
-/** Deterministic 16-char id from a seed so rebuilds don't churn ids. */
+/** Deterministic prefixed 16-char id ("acksHm" + 10 hash chars) from a seed. */
 function did(seed) {
-  return crypto.createHash("sha1").update(seed).digest("hex").slice(0, 16);
+  return "acksHm" + crypto.createHash("sha1").update(seed).digest("hex").slice(0, 10);
 }
 
 function effect(itemName, { label, changes, condition, target }) {

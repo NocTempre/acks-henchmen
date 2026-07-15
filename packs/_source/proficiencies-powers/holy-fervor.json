@@ -1,6 +1,6 @@
 {
-  "_id": "8c12e2a616ce63e2",
-  "_key": "!items!8c12e2a616ce63e2",
+  "_id": "acksHm8c12e2a616",
+  "_key": "!items!acksHm8c12e2a616",
   "name": "Holy Fervor",
   "type": "ability",
   "img": "icons/svg/book.svg",
@@ -19,8 +19,8 @@
   },
   "effects": [
     {
-      "_id": "8f1ce44aeba57219",
-      "_key": "!items.effects!8c12e2a616ce63e2.8f1ce44aeba57219",
+      "_id": "acksHm8f1ce44aeb",
+      "_key": "!items.effects!acksHm8c12e2a616.acksHm8f1ce44aeb",
       "name": "Holy Fervor",
       "type": "base",
       "img": "icons/svg/aura.svg",

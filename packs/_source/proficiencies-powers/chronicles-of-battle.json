@@ -1,6 +1,6 @@
 {
-  "_id": "9981830aeb8e45f6",
-  "_key": "!items!9981830aeb8e45f6",
+  "_id": "acksHm9981830aeb",
+  "_key": "!items!acksHm9981830aeb",
   "name": "Chronicles of Battle",
   "type": "ability",
   "img": "icons/svg/book.svg",
@@ -19,8 +19,8 @@
   },
   "effects": [
     {
-      "_id": "a61c3045369477f8",
-      "_key": "!items.effects!9981830aeb8e45f6.a61c3045369477f8",
+      "_id": "acksHma61c304536",
+      "_key": "!items.effects!acksHm9981830aeb.acksHma61c304536",
       "name": "Chronicles of Battle",
       "type": "base",
       "img": "icons/svg/aura.svg",

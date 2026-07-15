@@ -1,6 +1,6 @@
 {
-  "_id": "382a2b1710e12ca6",
-  "_key": "!items!382a2b1710e12ca6",
+  "_id": "acksHm382a2b1710",
+  "_key": "!items!acksHm382a2b1710",
   "name": "Blood of Ancient Kings",
   "type": "ability",
   "img": "icons/svg/book.svg",
@@ -19,8 +19,8 @@
   },
   "effects": [
     {
-      "_id": "3e7fc7d809dd6b09",
-      "_key": "!items.effects!382a2b1710e12ca6.3e7fc7d809dd6b09",
+      "_id": "acksHm3e7fc7d809",
+      "_key": "!items.effects!acksHm382a2b1710.acksHm3e7fc7d809",
       "name": "Blood of Ancient Kings",
       "type": "base",
       "img": "icons/svg/aura.svg",

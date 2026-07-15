@@ -1,6 +1,6 @@
 {
-  "_id": "b8f4dec57763e8f8",
-  "_key": "!items!b8f4dec57763e8f8",
+  "_id": "acksHmb8f4dec577",
+  "_key": "!items!acksHmb8f4dec577",
   "name": "Familial Loyalty",
   "type": "ability",
   "img": "icons/svg/book.svg",
@@ -19,8 +19,8 @@
   },
   "effects": [
     {
-      "_id": "84ce9022ddc10617",
-      "_key": "!items.effects!b8f4dec57763e8f8.84ce9022ddc10617",
+      "_id": "acksHm84ce9022dd",
+      "_key": "!items.effects!acksHmb8f4dec577.acksHm84ce9022dd",
       "name": "Familial Loyalty",
       "type": "base",
       "img": "icons/svg/aura.svg",

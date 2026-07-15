@@ -17,6 +17,13 @@
  *      manifest/download point at releases/latest/download.
  *   6. i18n: every "<ID-UPPERCASED>.x" key referenced in scripts/templates/
  *      ruledata exists in lang/en.json (dynamic-suffix tolerant).
+ *   7. Namespacing (one form per registry, no legacy exceptions — the
+ *      2026-07-15 migration brought every module into conformance):
+ *      globalThis exposures, custom hooks, and Handlebars helpers start with
+ *      the camelCased module id; lang keys with "<ID-UPPERCASED>."
+ *      (Foundry-owned roots like TYPES.* allowlisted); top-level CSS classes
+ *      with the module id; top-level pack _ids with the mandatory
+ *      module.json `flags.<id>.idPrefix` short key.
  *
  * Usage:  npm run validate
  */
@@ -193,5 +200,81 @@ if (module_?.id && fs.existsSync(path.join(ROOT, "lang", "en.json"))) {
   }
 }
 
+/* 7. Namespacing: shared-registry identifiers carry the module key. */
+if (module_?.id) {
+  const id = module_.id;
+  const camelNs = id.replace(/-([a-z0-9])/g, (_, c) => c.toUpperCase());
+  const idPrefix = module_.flags?.[id]?.idPrefix;
+  const warn = (file, message) => console.warn(`WARN ${file}: ${message}`);
+
+  // 7a. lang keys are module-prefixed (Foundry-owned roots allowlisted).
+  const FOUNDRY_LANG_ROOTS = ["TYPES"];
+  if (fs.existsSync(path.join(ROOT, "lang", "en.json"))) {
+    const upper = id.toUpperCase();
+    const lang = readJson("lang/en.json");
+    for (const key of Object.keys(lang)) {
+      const ok =
+        key === upper || key.startsWith(`${upper}.`) ||
+        FOUNDRY_LANG_ROOTS.some((root) => key === root || key.startsWith(`${root}.`));
+      if (!ok) fail("lang/en.json", `key "${key}" is not prefixed "${upper}." (Foundry-owned roots: ${FOUNDRY_LANG_ROOTS.join(", ")})`);
+    }
+  }
+
+  // 7b. top-level pack _ids start with the declared idPrefix.
+  if (fs.existsSync(sourceRoot)) {
+    if (!idPrefix) {
+      fail("module.json", `modules with packs must declare flags["${id}"].idPrefix (short key prefixing every pack document _id)`);
+    } else {
+      walk(sourceRoot, (full) => {
+        if (!full.endsWith(".json")) return;
+        let doc;
+        try {
+          doc = JSON.parse(fs.readFileSync(full, "utf8"));
+        } catch {
+          return; // JSON validity already reported in section 3/4
+        }
+        if (doc._id !== undefined && !String(doc._id).startsWith(idPrefix)) {
+          fail(rel(full), `_id "${doc._id}" does not start with declared idPrefix "${idPrefix}"`);
+        }
+      });
+    }
+  }
+
+  // 7c. runtime registrations in scripts/: globals, custom hooks, HB helpers.
+  walk(path.join(ROOT, "scripts"), (full) => {
+    if (!full.endsWith(".mjs")) return;
+    const text = fs.readFileSync(full, "utf8");
+    for (const m of text.matchAll(/globalThis\.([A-Za-z_$][\w$]*)\s*(?:\?\?=|\|\|=|=(?!=))/g)) {
+      if (!m[1].startsWith(camelNs)) fail(rel(full), `globalThis.${m[1]} must start with "${camelNs}"`);
+    }
+    // One form only: the camelCase module namespace (e.g. "acksInfluenceFoo").
+    for (const m of text.matchAll(/Hooks\.(?:call|callAll)\(\s*["'`]([^"'`]+)["'`]/g)) {
+      if (m[1].startsWith(camelNs)) continue;
+      if (/^acks/i.test(m[1])) warn(rel(full), `hook "${m[1]}" fires under a foreign acks-* namespace — fine only if it's a deliberate cross-module call`);
+      else fail(rel(full), `custom hook "${m[1]}" must start with "${camelNs}"`);
+    }
+    for (const m of text.matchAll(/Handlebars\.registerHelper\(\s*["'`]([^"'`]+)["'`]/g)) {
+      if (m[1].startsWith(camelNs)) continue;
+      if (/^acks/i.test(m[1])) warn(rel(full), `helper "${m[1]}" uses a foreign acks-* namespace`);
+      else fail(rel(full), `Handlebars helper "${m[1]}" must start with "${camelNs}"`);
+    }
+  });
+
+  // 7d. top-level CSS classes carry the module id (kebab, like the id itself).
+  const cssSeen = new Set();
+  walk(path.join(ROOT, "styles"), (full) => {
+    if (!full.endsWith(".css")) return;
+    for (const line of fs.readFileSync(full, "utf8").split("\n")) {
+      const m = /^\s*\.([a-zA-Z][\w-]*)/.exec(line);
+      if (!m) continue;
+      const cls = m[1];
+      if (!cls.startsWith(id) && !cssSeen.has(cls)) {
+        cssSeen.add(cls);
+        fail(rel(full), `top-level class ".${cls}" must start with "${id}"`);
+      }
+    }
+  });
+}
+
 if (failed) process.exit(1);
-console.log("validate: scripts, templates, JSON, packs, module.json, and i18n OK");
+console.log("validate: scripts, templates, JSON, packs, module.json, i18n, and namespacing OK");

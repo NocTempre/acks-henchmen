@@ -1,6 +1,6 @@
 {
-  "_id": "e73abf8a18442384",
-  "_key": "!items!e73abf8a18442384",
+  "_id": "acksHme73abf8a18",
+  "_key": "!items!acksHme73abf8a18",
   "name": "Mystic Aura",
   "type": "ability",
   "img": "icons/svg/book.svg",
@@ -19,8 +19,8 @@
   },
   "effects": [
     {
-      "_id": "ac40f39e195e904d",
-      "_key": "!items.effects!e73abf8a18442384.ac40f39e195e904d",
+      "_id": "acksHmac40f39e19",
+      "_key": "!items.effects!acksHme73abf8a18.acksHmac40f39e19",
       "name": "Mystic Aura",
       "type": "base",
       "img": "icons/svg/aura.svg",

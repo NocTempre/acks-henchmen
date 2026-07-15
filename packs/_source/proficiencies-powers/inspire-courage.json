@@ -1,6 +1,6 @@
 {
-  "_id": "96bf975aedae4a97",
-  "_key": "!items!96bf975aedae4a97",
+  "_id": "acksHm96bf975aed",
+  "_key": "!items!acksHm96bf975aed",
   "name": "Inspire Courage",
   "type": "ability",
   "img": "icons/svg/book.svg",
@@ -19,8 +19,8 @@
   },
   "effects": [
     {
-      "_id": "18a268ec83053fa2",
-      "_key": "!items.effects!96bf975aedae4a97.18a268ec83053fa2",
+      "_id": "acksHm18a268ec83",
+      "_key": "!items.effects!acksHm96bf975aed.acksHm18a268ec83",
       "name": "Inspire Courage",
       "type": "base",
       "img": "icons/svg/aura.svg",
