@@ -116,7 +116,7 @@
           <th>{{localize "ACKS-HENCHMEN.candidate.stats"}}</th>
           <th>{{localize "ACKS-HENCHMEN.candidate.wage"}}</th>
           <th>{{localize "ACKS-HENCHMEN.candidate.statusHeader"}}</th>
-          {{#if isGM}}<th></th>{{/if}}
+          <th></th>
         </tr>
       </thead>
       <tbody>
@@ -128,7 +128,6 @@
           <td>{{statLine}}</td>
           <td>{{#if wageGp}}{{wageGp}} gp/{{wageUnit}}{{/if}}</td>
           <td>{{statusLabel}}</td>
-          {{#if @root.isGM}}
           <td class="row-actions">
             {{#if rollable}}
             <a data-action="rollStats" data-tooltip="{{localize 'ACKS-HENCHMEN.candidate.rollStats'}}"><i class="fas fa-dice-six"></i></a>
@@ -138,9 +137,10 @@
             {{#if isAvailable}}
             <a data-action="recruit" data-tooltip="{{localize 'ACKS-HENCHMEN.candidate.recruit'}}"><i class="fas fa-handshake"></i></a>
             {{/if}}
+            {{#if @root.isGM}}
             <a data-action="removeCandidate" data-tooltip="{{localize 'ACKS-HENCHMEN.candidate.remove'}}"><i class="fas fa-trash"></i></a>
+            {{/if}}
           </td>
-          {{/if}}
         </tr>
         {{/each}}
       </tbody>

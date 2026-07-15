@@ -20,6 +20,7 @@ import { collectEffectModifiers, toDialogModifiers } from "../effects.mjs";
 import { signingBonusCost } from "../rules/wages.mjs";
 import { hire, updateCandidate } from "../engine/hire.mjs";
 import * as adapter from "../acks-adapter.mjs";
+import { executeAsGM, registerSocketAction } from "../sockets.mjs";
 import { now } from "../time.mjs";
 
 function hasBribery(employer) {
@@ -106,10 +107,33 @@ export async function openRecruitDialog(location, candidateId, preferredEmployer
     onResolve: async (result) => {
       const signingTier = result.parts.find((p) => p.id === "signingBonus")?.value ?? 0;
       const signingGp = signingTier > 0 ? (signingBonusCost(signingTier, wage, bribery)?.gp ?? 0) : 0;
-      await handleOutcome({ location, candidateId, employer, result, signingGp });
+      // Mutations (actor creation, location writes) run on the GM client.
+      await executeAsGM("hiringOutcome", {
+        locationUuid: location.uuid,
+        candidateId,
+        employerUuid: employer.uuid,
+        result: { outcome: result.outcome, natural: result.natural, total: result.total, parts: result.parts },
+        signingGp,
+      });
     },
   });
 }
+
+/** GM-side executor for a resolved hiring throw (socket action). */
+export async function handleHiringOutcomePayload(payload) {
+  const location = await fromUuid(payload.locationUuid);
+  const employer = await fromUuid(payload.employerUuid);
+  if (!location || !employer) return;
+  await handleOutcome({
+    location,
+    candidateId: payload.candidateId,
+    employer,
+    result: payload.result,
+    signingGp: payload.signingGp,
+  });
+}
+
+registerSocketAction("hiringOutcome", handleHiringOutcomePayload);
 
 async function handleOutcome({ location, candidateId, employer, result, signingGp }) {
   const outcome = result.outcome;

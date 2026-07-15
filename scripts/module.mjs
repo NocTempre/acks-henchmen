@@ -27,6 +27,9 @@ import { createPosting, processLocation, processAllLocations, effectiveMarketCla
 import { hire, checkHenchmanLimit, rollCandidateStats, rollCandidateClass, rollCandidateLevel } from "./engine/hire.mjs";
 import { onTimeAdvanced, advanceDays, now } from "./time.mjs";
 import { bindCardListeners, registerCardAction } from "./chat/cards.mjs";
+import { registerSockets, executeAsGM, registerSocketAction } from "./sockets.mjs";
+import { registerEventEngine, openLoyaltyRoll, openObedienceRoll, recordCalamity, payWagesFor } from "./engine/events.mjs";
+import { openRosterApp } from "./apps/roster-app.mjs";
 
 Hooks.once("init", () => {
   console.log(`${MODULE_ID} | Initializing`);
@@ -46,6 +49,7 @@ Hooks.once("init", () => {
       `${T}/location-sheet.hbs`,
       `${T}/posting-dialog.hbs`,
       `${T}/throw-dialog.hbs`,
+      `${T}/roster-app.hbs`,
       `${T}/chat/throw-card.hbs`,
       `${T}/chat/reveal-card.hbs`,
       `${T}/chat/event-card.hbs`,
@@ -77,7 +81,13 @@ Hooks.once("setup", async () => {
     ThrowDialog,
     openPostingDialog,
     openRecruitDialog,
+    openRosterApp,
     LocationSheet,
+    // loyalty automation
+    openLoyaltyRoll,
+    openObedienceRoll,
+    recordCalamity,
+    payWagesFor,
     // engine
     createPosting,
     processLocation,
@@ -110,6 +120,9 @@ Hooks.once("ready", () => {
     return;
   }
 
+  registerSockets();
+  registerEventEngine();
+
   // GM-side due-processing whenever world time moves (posting aging, arrival
   // tranches, weekly fees, month rollover). Idempotent per posting.
   onTimeAdvanced((worldTime) => processAllLocations(worldTime));
@@ -136,5 +149,25 @@ Hooks.once("ready", () => {
 /* Bind event-card buttons (v13 jQuery + v14 HTMLElement signatures). */
 Hooks.on("renderChatMessageHTML", (_message, html) => bindCardListeners(html));
 Hooks.on("renderChatMessage", (_message, html) => bindCardListeners(html));
+
+/* Roster button on acks character sheets (additive DOM only — the
+ * acks-domains/acks-influence injection pattern, dedupe-guarded). */
+Hooks.on("renderActorSheetV2", (app, element) => {
+  if (game.system?.id !== "acks") return;
+  const actor = app.actor ?? app.document;
+  if (actor?.type !== "character" || actor.system?.retainer?.enabled) return;
+  if (!actor.isOwner) return;
+  const root = element instanceof HTMLElement ? element : element?.[0];
+  const header = root?.querySelector(".window-header");
+  if (!header || header.querySelector(".acks-henchmen-roster-button")) return;
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "header-control icon fa-solid fa-people-group acks-henchmen-roster-button";
+  button.dataset.tooltip = game.i18n.localize("ACKS-HENCHMEN.roster.open");
+  button.addEventListener("click", () => openRosterApp(actor));
+  const closeButton = header.querySelector('[data-action="close"]');
+  if (closeButton) header.insertBefore(button, closeButton);
+  else header.append(button);
+});
 
 export { registerCardAction, getSetting };

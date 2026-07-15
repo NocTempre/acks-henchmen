@@ -88,17 +88,44 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
       };
     });
 
+    // Players see only ARRIVED candidates (the board shows "what your post
+    // says is available at the moment"), scoped by the visibility setting and
+    // per-posting detail masking. Pending/withdrawn rows are GM knowledge.
+    const visibility = game.settings.get(MODULE_ID, "playerMarketVisibility");
+    const postingById = new Map((sys.postings ?? []).map((p) => [p.id, p]));
+    const userCharacterUuids = game.user.isGM
+      ? []
+      : game.actors.filter((a) => a.testUserPermission(game.user, "OWNER")).map((a) => a.uuid);
+    const playerVisible = (c) => {
+      if (game.user.isGM) return true;
+      if (visibility === "none") return false;
+      if (!["available", "hired"].includes(c.status)) return false;
+      const posting = postingById.get(c.postingId);
+      if (!posting) return false;
+      if (visibility === "owned" && !userCharacterUuids.includes(posting.employerUuid)) return false;
+      return true;
+    };
     context.candidates = candidates
-      .map((c) => ({
-        ...(c.toObject?.() ?? c),
-        statusLabel: game.i18n.localize(`ACKS-HENCHMEN.candidate.status.${c.status}`),
-        isAvailable: c.status === "available",
-        hasStats: c.attributes?.str != null,
-        statLine: c.attributes?.str != null
-          ? `${c.attributes.str}/${c.attributes.int}/${c.attributes.wil}/${c.attributes.dex}/${c.attributes.con}/${c.attributes.cha}`
-          : "",
-        rollable: ["henchman", "henchmanByClass", "henchmanByProficiency"].includes(c.kind),
-      }))
+      .filter(playerVisible)
+      .map((c) => {
+        const obj = c.toObject?.() ?? c;
+        const posting = postingById.get(obj.postingId);
+        const masked = !game.user.isGM && posting && posting.playersSeeDetails === false;
+        return {
+          ...obj,
+          name: masked ? game.i18n.localize("ACKS-HENCHMEN.candidate.masked") : obj.name,
+          classKey: masked ? "" : obj.classKey,
+          template: masked ? "" : obj.template,
+          statusLabel: game.i18n.localize(`ACKS-HENCHMEN.candidate.status.${obj.status}`),
+          isAvailable: obj.status === "available",
+          hasStats: obj.attributes?.str != null,
+          statLine:
+            !masked && obj.attributes?.str != null
+              ? `${obj.attributes.str}/${obj.attributes.int}/${obj.attributes.wil}/${obj.attributes.dex}/${obj.attributes.con}/${obj.attributes.cha}`
+              : "",
+          rollable: game.user.isGM && ["henchman", "henchmanByClass", "henchmanByProficiency"].includes(obj.kind),
+        };
+      })
       .sort((a, b) => (a.status === b.status ? 0 : a.status === "available" ? -1 : 1));
 
     context.slander = (sys.slander ?? []).map((s, index) => ({ ...(s.toObject?.() ?? s), index }));

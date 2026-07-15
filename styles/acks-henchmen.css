@@ -226,3 +226,112 @@
   align-items: center;
   margin: 0.15rem 0;
 }
+
+/* ------------------------------ roster app ------------------------------ */
+.acks-henchmen.roster-app .roster-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.acks-henchmen.roster-app .roster-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--color-border-dark-tertiary, #7a7971);
+  padding-bottom: 0.35rem;
+}
+
+.acks-henchmen.roster-app .limit-meter {
+  padding: 0.15em 0.5em;
+  border: 1px solid var(--color-border-dark-tertiary, #7a7971);
+  border-radius: 3px;
+}
+
+.acks-henchmen.roster-app .limit-meter.over {
+  border-color: #a02b2b;
+  color: #a02b2b;
+  font-weight: bold;
+}
+
+.acks-henchmen.roster-app .wage-summary {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.acks-henchmen.roster-app .wage-summary button {
+  width: auto;
+  line-height: 1.5;
+}
+
+.acks-henchmen.roster-app details.roster-row {
+  border: 1px solid var(--color-border-light-tertiary, #b5b3a4);
+  border-radius: 4px;
+  padding: 0.2rem 0.4rem;
+}
+
+.acks-henchmen.roster-app details.roster-row.wage-due {
+  border-left: 3px solid #a08325;
+}
+
+.acks-henchmen.roster-app .roster-row summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.acks-henchmen.roster-app .roster-row summary img {
+  width: 28px;
+  height: 28px;
+  border: none;
+  object-fit: cover;
+}
+
+.acks-henchmen.roster-app .row-name {
+  font-weight: bold;
+}
+
+.acks-henchmen.roster-app .row-tag {
+  font-size: 0.85em;
+  opacity: 0.8;
+}
+
+.acks-henchmen.roster-app .row-stat {
+  margin-left: 0.5rem;
+  white-space: nowrap;
+}
+
+.acks-henchmen.roster-app .row-stat.due {
+  color: #a08325;
+}
+
+.acks-henchmen.roster-app .row-actions {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.acks-henchmen.roster-app .row-actions a {
+  margin: 0 0.2rem;
+}
+
+.acks-henchmen.roster-app .row-details {
+  padding: 0.25rem 0.5rem 0.25rem 2.3rem;
+}
+
+.acks-henchmen.roster-app .event-log {
+  width: 100%;
+  font-size: 0.85em;
+  border-collapse: collapse;
+}
+
+.acks-henchmen.roster-app .event-log td {
+  padding: 0.1rem 0.3rem;
+  border-top: 1px dotted var(--color-border-light-tertiary, #b5b3a4);
+}
