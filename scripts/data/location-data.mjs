@@ -179,6 +179,11 @@ export class LocationData extends foundry.abstract.TypeDataModel {
           weight: int(1),
         })
       ),
+      // Start of the location's current market month. The WHOLE market
+      // (every henchman level, troop type, and specialist type) is rolled at
+      // each month's beginning even if nobody is hiring — so a party that
+      // starts searching in week 2 finds the town as it already is.
+      monthAnchorTime: int(0),
       // The LOCATION's monthly availability ledger: one entry per generic
       // segment rolled this month (availability is a property of the market,
       // RR 162 — shared by all recruiters; rolled once per month per type).

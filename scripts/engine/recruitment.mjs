@@ -195,35 +195,55 @@ async function buildCandidates({ location, spec, total, marketClass, segment, pr
 /* ------------------------- shared pools ------------------------- */
 
 /**
- * Ensure the location's shared pool for a generic segment is rolled for the
- * current month (RR 162: availability belongs to the market). Idempotent:
- * an existing current-month entry is returned untouched.
- * @returns {Promise<{roll: object, candidates: object[], fresh: boolean}>}
+ * Every generic spec this location's market carries: henchmen of each level,
+ * every mercenary troop type (camel troops only in desert realms), every
+ * specialist type.
  */
-export async function ensureSegmentRolled(location, spec, { marketRollsOverride = null } = {}) {
-  const segment = segmentKeyFor(spec);
-  const currentTime = now();
-  const rolls = (marketRollsOverride ?? location.system.marketRolls ?? []).map(
-    (r) => r.toObject?.() ?? foundry.utils.deepClone(r)
-  );
-  const existing = rolls.find((r) => r.segment === segment && currentTime - r.monthStartTime < secondsPerMonth());
-  if (existing) return { roll: existing, candidates: [], fresh: false };
+export function allSegmentSpecs(location) {
+  const specs = [];
+  for (let level = 0; level <= 4; level++) specs.push({ kind: "henchman", level });
+  for (const row of getTable("availability", "mercenaryAvailability").rows) {
+    if (row.desert && !location.system.desertRealm) continue;
+    specs.push({ kind: "mercenary", troopType: row.type });
+  }
+  for (const row of getTable("availability", "specialistAvailability").rows) {
+    specs.push({ kind: "specialist", specialistType: row.type });
+  }
+  return specs;
+}
 
-  const marketClass = location.system.marketClass; // location's own stock
-  const result = await rollMonthlyPool(spec, marketClass, rollDice);
-  if (result.error) return { error: result.error };
-  const candidates = await buildCandidates({
-    location,
-    spec,
-    total: result.quantity,
-    marketClass,
-    segment,
-    privateToUuid: "",
-    monthStart: currentTime,
-  });
-  const entry = { segment, monthStartTime: currentTime, total: result.quantity, detail: result.detail };
-  const nextRolls = [...rolls.filter((r) => r.segment !== segment), entry];
-  return { roll: entry, candidates, fresh: true, nextRolls };
+/**
+ * Roll the WHOLE market for a new month (RR 162: availability belongs to
+ * the town, and the townsfolk exist whether or not anyone is hiring — a
+ * party that starts searching in week 2 finds week-1 arrivals already come
+ * and gone). Purges every public row of the previous month (hired
+ * candidates live on as actors) and rebuilds all segments anchored at
+ * `anchorTime`.
+ * @returns {Promise<{candidates: object[], marketRolls: object[]}>}
+ */
+export async function rollMonth(location, anchorTime) {
+  const marketClass = location.system.marketClass; // the town's own stock
+  const candidates = [];
+  const marketRolls = [];
+  for (const spec of allSegmentSpecs(location)) {
+    const segment = segmentKeyFor(spec);
+    const result = await rollMonthlyPool(spec, marketClass, rollDice);
+    if (result.error) continue;
+    marketRolls.push({ segment, monthStartTime: anchorTime, total: result.quantity, detail: result.detail });
+    if (result.quantity <= 0) continue;
+    candidates.push(
+      ...(await buildCandidates({
+        location,
+        spec,
+        total: result.quantity,
+        marketClass,
+        segment,
+        privateToUuid: "",
+        monthStart: anchorTime,
+      }))
+    );
+  }
+  return { candidates, marketRolls };
 }
 
 /* ------------------------- postings (paid searches) ------------------------- */
@@ -286,6 +306,7 @@ export async function createPosting(location, spec, employer, { dedicatedSearche
 
   let newCandidates = [];
   let nextRolls = null;
+  let anchorUpdate = null;
 
   if (isPrivate) {
     const mc = effectiveMarketClass(location, employer);
@@ -308,14 +329,19 @@ export async function createPosting(location, spec, employer, { dedicatedSearche
       rarity: result.rarity,
     });
   } else {
-    const ensured = await ensureSegmentRolled(location, spec);
-    if (ensured.error) return { error: ensured.error };
-    posting.totalAvailable = ensured.roll.total;
-    posting.rollDetail = ensured.roll.detail;
-    if (ensured.fresh) {
-      newCandidates = ensured.candidates;
-      nextRolls = ensured.nextRolls;
+    // The town's market is rolled at month start regardless of searches —
+    // a posting just buys access. Initialize the market on first contact.
+    let rolls = (location.system.marketRolls ?? []).map((r) => r.toObject?.() ?? r);
+    if (!location.system.monthAnchorTime || !rolls.length) {
+      const month = await rollMonth(location, currentTime);
+      newCandidates = month.candidates;
+      nextRolls = month.marketRolls;
+      rolls = month.marketRolls;
+      anchorUpdate = currentTime;
     }
+    const entry = rolls.find((r) => r.segment === segment);
+    posting.totalAvailable = entry?.total ?? 0;
+    posting.rollDetail = entry?.detail ?? "";
   }
 
   const fee = await chargeWeeklyFee(location, employer);
@@ -335,6 +361,7 @@ export async function createPosting(location, spec, employer, { dedicatedSearche
     ];
   }
   if (nextRolls) update["system.marketRolls"] = nextRolls;
+  if (anchorUpdate) update["system.monthAnchorTime"] = anchorUpdate;
   await location.update(update);
   Hooks.callAll(HOOKS.POSTING_CREATED, { location, posting, employer });
   return { posting, fee };
@@ -355,7 +382,37 @@ export async function processLocation(location, currentTime = now()) {
   let marketRolls = (sys.marketRolls ?? []).map((r) => r.toObject?.() ?? foundry.utils.deepClone(r));
   const ledger = (sys.searchLedger ?? []).map((l) => l.toObject?.() ?? foundry.utils.deepClone(l));
   let changed = false;
+  let monthAnchorTime = sys.monthAnchorTime || 0;
   const arrivals = new Map();
+
+  // 0. Month anchor: the WHOLE market rolls at the start of every month,
+  // hiring or no hiring. Initialize on first contact; on rollover, purge
+  // all public rows (hired candidates are actors now) and re-roll. When
+  // multiple months elapsed unobserved, only the current one matters.
+  if (!monthAnchorTime) {
+    monthAnchorTime = currentTime;
+    const month = await rollMonth(location, monthAnchorTime);
+    candidates = [...candidates.filter((c) => c.privateToUuid), ...month.candidates];
+    marketRolls = month.marketRolls;
+    changed = true;
+  } else if (currentTime - monthAnchorTime >= secondsPerMonth()) {
+    while (currentTime - monthAnchorTime >= secondsPerMonth()) monthAnchorTime += secondsPerMonth();
+    const month = await rollMonth(location, monthAnchorTime);
+    candidates = [...candidates.filter((c) => c.privateToUuid), ...month.candidates];
+    marketRolls = month.marketRolls;
+    changed = true;
+  }
+  // Keep active generic postings' info in sync with the current month.
+  for (const posting of postings) {
+    if (posting.status !== "active" || !posting.segment) continue;
+    const entry = marketRolls.find((r) => r.segment === posting.segment);
+    if (entry && posting.monthStartTime !== entry.monthStartTime) {
+      posting.monthStartTime = entry.monthStartTime;
+      posting.totalAvailable = entry.total;
+      posting.rollDetail = entry.detail;
+      changed = true;
+    }
+  }
 
   // 1. Arrivals: pending candidates whose week has come. (Pending rows are
   // GM-only information everywhere — players never see who hasn't arrived.)
@@ -422,33 +479,15 @@ export async function processLocation(location, currentTime = now()) {
     posting.lastProcessedTime = currentTime;
   }
 
-  // 3b. Shared segments: month rollover — the fresh week-1 roll PURGES all
-  // of the segment's old rows (hired, refused, unhired alike); re-roll
-  // while any active posting still covers the segment.
-  for (const roll of [...marketRolls]) {
-    if (currentTime - roll.monthStartTime < secondsPerMonth()) continue;
-    candidates = candidates.filter((c) => c.segment !== roll.segment);
-    marketRolls = marketRolls.filter((r) => r.segment !== roll.segment);
-    changed = true;
-    const active = postings.find((p) => p.status === "active" && p.segment === roll.segment);
-    if (active) {
-      const spec = active.spec.toObject?.() ?? active.spec;
-      const ensured = await ensureSegmentRolled(location, spec, { marketRollsOverride: marketRolls });
-      if (!ensured.error && ensured.fresh) {
-        marketRolls = [...marketRolls, ensured.roll];
-        candidates.push(...ensured.candidates);
-        active.totalAvailable = ensured.roll.total;
-        active.rollDetail = ensured.roll.detail;
-        active.monthStartTime = currentTime;
-      }
-    }
-  }
+  // (Shared-segment rollover is handled by the month anchor in step 0 —
+  // the whole market re-rolls together at each month's start.)
 
   if (changed) {
     await location.update({
       "system.postings": postings,
       "system.candidates": candidates,
       "system.marketRolls": marketRolls,
+      "system.monthAnchorTime": monthAnchorTime,
       "system.searchLedger": ledger,
     });
     for (const [segment, count] of arrivals) {
