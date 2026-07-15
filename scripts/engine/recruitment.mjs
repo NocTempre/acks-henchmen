@@ -357,7 +357,8 @@ export async function processLocation(location, currentTime = now()) {
   let changed = false;
   const arrivals = new Map();
 
-  // 1. Arrivals: pending candidates whose week has come.
+  // 1. Arrivals: pending candidates whose week has come. (Pending rows are
+  // GM-only information everywhere — players never see who hasn't arrived.)
   for (const c of candidates) {
     if (c.status === "pending" && c.availableFromTime <= currentTime) {
       c.status = "available";
@@ -366,6 +367,14 @@ export async function processLocation(location, currentTime = now()) {
       arrivals.set(key, (arrivals.get(key) ?? 0) + (c.quantity ?? 1));
     }
   }
+
+  // 1b. Weekly churn: a candidate stays on the market for ONE WEEK after
+  // arriving — unhired, they take other work and DISAPPEAR from the list.
+  const before = candidates.length;
+  candidates = candidates.filter(
+    (c) => !(c.status === "available" && currentTime - c.availableFromTime >= SECONDS_PER_WEEK)
+  );
+  if (candidates.length !== before) changed = true;
 
   // 2. Weekly fees per active posting (fee per week per type searched).
   for (const posting of postings) {
@@ -382,13 +391,9 @@ export async function processLocation(location, currentTime = now()) {
     }
 
     // 3a. Private searches: monthly re-roll while the posting stays active.
+    // The fresh roll PURGES last month's rows (hired ones are actors now).
     if (PRIVATE_KINDS.includes(posting.spec.kind) && currentTime - posting.monthStartTime >= secondsPerMonth()) {
-      candidates = candidates.map((c) => {
-        if (c.privateToUuid === posting.employerUuid && ["pending", "available"].includes(c.status)) {
-          return { ...c, status: "withdrawn" };
-        }
-        return c;
-      });
+      candidates = candidates.filter((c) => c.privateToUuid !== posting.employerUuid);
       const mc = effectiveMarketClass(location, employer);
       const spec = posting.spec.toObject?.() ?? posting.spec;
       const result = await rollMonthlyPool(spec, mc, rollDice, Math.random, sys.classRarityTableId || "default");
@@ -417,16 +422,12 @@ export async function processLocation(location, currentTime = now()) {
     posting.lastProcessedTime = currentTime;
   }
 
-  // 3b. Shared segments: month rollover — withdraw the stale pool; re-roll
+  // 3b. Shared segments: month rollover — the fresh week-1 roll PURGES all
+  // of the segment's old rows (hired, refused, unhired alike); re-roll
   // while any active posting still covers the segment.
   for (const roll of [...marketRolls]) {
     if (currentTime - roll.monthStartTime < secondsPerMonth()) continue;
-    candidates = candidates.map((c) => {
-      if (c.segment === roll.segment && ["pending", "available"].includes(c.status)) {
-        return { ...c, status: "withdrawn" };
-      }
-      return c;
-    });
+    candidates = candidates.filter((c) => c.segment !== roll.segment);
     marketRolls = marketRolls.filter((r) => r.segment !== roll.segment);
     changed = true;
     const active = postings.find((p) => p.status === "active" && p.segment === roll.segment);
