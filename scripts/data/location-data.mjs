@@ -109,6 +109,26 @@ function candidateField() {
 export class LocationData extends foundry.abstract.TypeDataModel {
   static defineSchema() {
     return {
+      // --- acks system compatibility stubs -------------------------------
+      // AcksActor.prepareDerivedData runs for EVERY actor type and touches
+      // these fields unconditionally (computeAAB: thac0.bba = 10 - thac0.throw;
+      // computeAdditionnalData: initiative.value, movement.encounter). All
+      // other core compute functions guard on type === "character". Without
+      // the stubs every location update logs a failed-data-preparation error.
+      // Values are meaningless for a settlement; the writes stay in memory.
+      thac0: new fields.SchemaField({
+        throw: int(10),
+        bba: int(0),
+      }),
+      initiative: new fields.SchemaField({
+        value: int(0),
+        mod: int(0),
+      }),
+      movement: new fields.SchemaField({
+        base: int(0),
+        encounter: int(0),
+      }),
+      // --- location data -------------------------------------------------
       region: str(),
       notes: new fields.HTMLField({ required: false, blank: true, initial: "" }),
       // Market-class derivation inputs: explicit override wins, then urban
