@@ -1,10 +1,13 @@
 name: Release
 
+# Canonical workflow — synced from acks-module-template. Edit it there and run
+# bin/sync-toolchain.mjs; do not hand-edit per module.
+#
 # Cut a release by pushing a version tag, e.g.:
 #   git tag v0.1.0 && git push origin v0.1.0
 # This builds module.zip and attaches module.json + module.zip to the GitHub
-# release, which the manifest URL below resolves to:
-#   https://github.com/NocTempre/acks-henchmen/releases/latest/download/module.json
+# release, which the module.json manifest URL resolves to:
+#   https://github.com/NocTempre/<id>/releases/latest/download/module.json
 
 on:
   push:
@@ -36,13 +39,17 @@ jobs:
             exit 1
           fi
 
-      - name: Build compendium packs
-        run: |
-          npm install
-          npm run build:packs
+      - name: Install dev dependencies
+        run: npm ci
 
-      - name: Validate scripts, templates, and JSON
-        run: npm run validate
+      - name: Build compendium packs
+        run: npm run build:packs --if-present
+
+      - name: Validate scripts, templates, JSON, and packs
+        run: npm run validate --if-present
+
+      - name: Run logic tests
+        run: npm run test --if-present
 
       - name: Verify every declared pack exists
         run: |
@@ -61,19 +68,14 @@ jobs:
 
       - name: Create module.zip
         run: |
-          # Ship compiled packs (packs/*) but not the JSON sources (packs/_source).
-          # ruledata/ MUST ship: the module fetches it at runtime.
-          zip -r module.zip \
-            module.json \
-            scripts \
-            templates \
-            styles \
-            lang \
-            ruledata \
-            packs \
-            README.md \
-            docs \
-            -x 'packs/_source/*'
+          # Ship-by-default: everything the module needs at runtime is included
+          # automatically (docs/, ruledata/, future dirs). The -x list names
+          # dev-only paths; extend it only for new DEV-ONLY content.
+          zip -r module.zip . \
+            -x '.git/*' '.github/*' '.claude/*' 'node_modules/*' \
+               'packs/_source/*' 'tools/*' \
+               'package.json' 'package-lock.json' \
+               '.gitignore' '.gitattributes' 'CLAUDE.md' 'module.zip'
 
       - name: Publish release
         uses: softprops/action-gh-release@v2

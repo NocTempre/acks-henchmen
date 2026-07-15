@@ -1,3 +1,7 @@
+# Dev-only artifacts. NOTE: never ignore packs/**/*.log — compiled LevelDB
+# packs store live data in .log files and are committed + shipped.
 node_modules/
 *.zip
 .DS_Store
+npm-debug.log*
+.claude/settings.local.json
