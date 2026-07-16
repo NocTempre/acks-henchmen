@@ -10,19 +10,51 @@
 import { getTable } from "./tables.mjs";
 
 /**
- * Random class via the JJ GM-screen double-d100 grid: first d100 picks the
- * row band, second the column band. "special" = Judge picks from the
- * expansion books.
+ * Random class via the JJ GM-screen double-d100 distribution (RAW cells,
+ * bucket-first): the first d100 selects the BUCKET, the second resolves the
+ * class on that bucket's ladder. A location rarity variant may override the
+ * buckets (JJ 118: rarity varies by settlement). "special" = Judge picks
+ * from the expansion books.
  * @param {(f: string) => Promise<number>} rollDice
- * @returns {Promise<{classKey: string, rolls: [number, number]}>}
+ * @param {string} [variant="default"] - classRarityTables variant id
+ * @returns {Promise<{classKey: string, bucket: string, rolls: [number, number]}>}
  */
-export async function rollClassFromGrid(rollDice) {
-  const grid = getTable("rarity", "leveledClassGrid");
+export async function rollClassFromDistribution(rollDice, variant = "default") {
+  const distribution = getTable("rarity", "classDistribution");
+  const variants = getTable("rarity", "classRarityTables").variants;
+  const buckets = variants[variant]?.buckets ?? distribution.buckets;
+  const bucketRoll = await rollDice("1d100");
   const rowRoll = await rollDice("1d100");
-  const colRoll = await rollDice("1d100");
-  const row = grid.rows.find((r) => rowRoll >= r.min && rowRoll <= r.max);
-  const colIndex = grid.columns.findIndex((c) => colRoll >= c.min && colRoll <= c.max);
-  return { classKey: row?.classes?.[colIndex] ?? "special", rolls: [rowRoll, colRoll] };
+  const bucket = buckets.find((b) => bucketRoll >= b.min && bucketRoll <= b.max) ?? buckets[buckets.length - 1];
+  const row = bucket.rows.find((r) => rowRoll >= r.min && rowRoll <= r.max);
+  return { classKey: row?.class ?? "special", bucket: bucket.id, rolls: [bucketRoll, rowRoll] };
+}
+
+/**
+ * 0th-level class trajectory: the BUCKET rolls from the JJ 247 level-0
+ * archetype weights, then the class resolves on the same bucket ladder.
+ * @returns {Promise<{classKey: string, bucket: string, rolls: [number, number]}>}
+ */
+export async function rollTrajectoryFromDistribution(rollDice, variant = "default") {
+  const distribution = getTable("rarity", "classDistribution");
+  const variants = getTable("rarity", "classRarityTables").variants;
+  const buckets = variants[variant]?.buckets ?? distribution.buckets;
+  const weights = distribution.trajectoryBucketWeights.weights;
+  const total = Object.values(weights).reduce((s, w) => s + w, 0);
+  const bucketRoll = await rollDice(`1d${total}`);
+  let running = 0;
+  let bucketId = Object.keys(weights)[0];
+  for (const [id, w] of Object.entries(weights)) {
+    running += w;
+    if (bucketRoll <= running) {
+      bucketId = id;
+      break;
+    }
+  }
+  const bucket = buckets.find((b) => b.id === bucketId) ?? buckets[0];
+  const rowRoll = await rollDice("1d100");
+  const row = bucket.rows.find((r) => rowRoll >= r.min && rowRoll <= r.max);
+  return { classKey: row?.class ?? "special", bucket: bucket.id, rolls: [bucketRoll, rowRoll] };
 }
 
 /**

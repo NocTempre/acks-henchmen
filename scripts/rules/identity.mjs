@@ -21,77 +21,25 @@ function pickWeighted(rand, entries, weightOf) {
   return entries[entries.length - 1];
 }
 
-/** The race a class belongs to ("human" for everything unlisted). */
+/** Registry entry for a class ({bucket, rarity, race?, cultures?, sex?}). */
+export function classInfo(classKey) {
+  const registry = getTable("people", "classRegistry").classes;
+  return registry[String(classKey ?? "").toLowerCase().trim()] ?? null;
+}
+
+/** The race a class belongs to ("human" when the registry declares none). */
 export function raceForClass(classKey) {
-  const wanted = String(classKey ?? "").toLowerCase().trim();
-  if (!wanted) return "human";
-  // Prefix rule covers every current and future racial class list
-  // (dwarven delver, elven courtier, zaharan sorcerer…).
-  for (const [prefix, race] of [
-    ["dwarven", "dwarf"],
-    ["elven", "elf"],
-    ["zaharan", "zaharan"],
-    ["nobiran", "nobiran"],
-  ]) {
-    if (wanted.startsWith(prefix)) return race;
-  }
-  const table = getTable("people", "classRaces").byRace;
-  for (const [race, classes] of Object.entries(table)) {
-    if (classes.some((c) => wanted === c)) return race;
-  }
-  return "human";
+  return classInfo(classKey)?.race ?? "human";
 }
 
 /** Optional per-class culture whitelist (barbarians, shamans…). */
 export function culturesForClass(classKey) {
-  const table = getTable("people", "classRaces").classCultures ?? {};
-  const wanted = String(classKey ?? "").toLowerCase().trim();
-  return table[wanted] ?? null;
+  return classInfo(classKey)?.cultures ?? null;
 }
 
 /** Sex restriction for a class ("female", "male", or null). */
 export function sexForClass(classKey) {
-  const table = getTable("people", "classRaces").classSex ?? {};
-  const wanted = String(classKey ?? "").toLowerCase().trim();
-  if ((table.female ?? []).includes(wanted)) return "female";
-  if ((table.male ?? []).includes(wanted)) return "male";
-  return null;
-}
-
-/**
- * REGION-WEIGHTED class trajectory: the class probabilities are organized
- * by region, so the class rolls FIRST. The human JJ 247 weights and each
- * demihuman race's own trajectory weights merge in proportion to the
- * location's demographics race shares (uniformly human when unset).
- */
-export function rollRegionTrajectory(rand, demographics, level = 0) {
-  const cultures = getTable("people", "cultures").list;
-  const raceWeights = { human: 0 };
-  for (const d of demographics ?? []) {
-    if (!(d.culture in cultures) || !(d.weight > 0)) continue;
-    const race = cultures[d.culture].race ?? "human";
-    raceWeights[race] = (raceWeights[race] ?? 0) + d.weight;
-  }
-  if (Object.values(raceWeights).reduce((s, w) => s + w, 0) <= 0) raceWeights.human = 1;
-
-  const humanRows = getTable("people", "classPercentages").rows;
-  const humanRow = humanRows.find((r) => level >= r.minLevel && level <= r.maxLevel) ?? humanRows[0];
-  const demi = getTable("people", "demihumanTrajectories").byRace;
-  const merged = new Map();
-  const addWeights = (weights, raceShare, ownTotal) => {
-    for (const [cls, w] of Object.entries(weights)) {
-      merged.set(cls, (merged.get(cls) ?? 0) + (w / ownTotal) * raceShare);
-    }
-  };
-  const totalShare = Object.values(raceWeights).reduce((s, w) => s + w, 0);
-  for (const [race, share] of Object.entries(raceWeights)) {
-    if (share <= 0) continue;
-    const weights = race === "human" ? humanRow.weights : (demi[race] ?? humanRow.weights);
-    const ownTotal = Object.values(weights).reduce((s, w) => s + w, 0) || 1;
-    addWeights(weights, share / totalShare, ownTotal);
-  }
-  const entries = [...merged.entries()];
-  return pickWeighted(rand, entries, ([, w]) => w)[0];
+  return classInfo(classKey)?.sex ?? null;
 }
 
 /** The race of a culture ("human" when the entry declares none). */
@@ -104,7 +52,7 @@ export function raceOfCulture(cultureId) {
  * CONSTRAINED to a race so culture and class always align (no Zaharan
  * humans, no elven vaultguards). Falls back to the race's own culture(s)
  * when the demographics don't include one; Nobiran and other human-passing
- * bloodlines use `classRaces.raceCultures`.
+ * bloodlines use `classRegistry.raceCultures`.
  */
 export function pickCulture(rand, demographics, race = null, cultureWhitelist = null) {
   const cultures = getTable("people", "cultures").list;
@@ -112,10 +60,8 @@ export function pickCulture(rand, demographics, race = null, cultureWhitelist = 
     if (cultureWhitelist && !cultureWhitelist.includes(id)) return false;
     if (!race) return true;
     if (race === "human") return raceOfCulture(id) === "human";
-    if (race === "nobiran") {
-      const allowed = getTable("people", "classRaces").raceCultures?.nobiran ?? [];
-      return allowed.includes(id);
-    }
+    const raceCultures = getTable("people", "classRegistry").raceCultures?.[race];
+    if (raceCultures) return raceCultures.includes(id);
     return raceOfCulture(id) === race;
   };
   const weighted = (demographics ?? []).filter((d) => d.culture in cultures && d.weight > 0 && matchesRace(d.culture));
@@ -198,16 +144,16 @@ export function generateTrajectoryClass(rand, level) {
  * @returns {{name, gender, culture, cultureLabel, age, appearance,
  *            occupation, occupationCategory, classKey}}
  */
-export function generateIdentity({ rand = Math.random, demographics = [], level = 0, classKey = "", rollTrajectory = true } = {}) {
+export function generateIdentity({ rand = Math.random, demographics = [], level = 0, classKey = "" } = {}) {
   const cultures = getTable("people", "cultures").list;
-  // GENERATION ORDER: class → culture → sex → name/age/appearance.
-  // The class rolls FIRST (probabilities are organized by region); the
-  // result then constrains everything downstream — many classes are race-,
-  // culture-, and/or sex-restricted (no Zaharan humans, no elven
-  // vaultguards, no male furnacewives). Specialists pass
-  // rollTrajectory: false — their specialty is not a class.
-  let resolvedClass = classKey || (rollTrajectory ? rollRegionTrajectory(rand, demographics, Math.max(0, level ?? 0)) : "");
-  const culture = pickCulture(rand, demographics, raceForClass(resolvedClass), culturesForClass(resolvedClass));
+  // GENERATION ORDER: class → culture → sex → name/age/appearance. The
+  // class was rolled FIRST (bucket distribution, engine-side); here it
+  // resolves downstream: culture follows the REGION distribution unless the
+  // class registry restricts race/cultures (the restriction overrides the
+  // region), and sex follows the registry's class restriction when present.
+  // No class (specialists, mass labor) = unrestricted human.
+  const resolvedClass = classKey || "";
+  const culture = pickCulture(rand, demographics, resolvedClass ? raceForClass(resolvedClass) : "human", culturesForClass(resolvedClass));
   const gender = sexForClass(resolvedClass) ?? (rand() < 0.5 ? "male" : "female");
   const name = generateName(rand, culture, gender);
   let occupation = "";

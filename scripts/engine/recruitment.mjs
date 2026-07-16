@@ -30,7 +30,7 @@ import {
   clampMarketClass,
 } from "../rules/availability.mjs";
 import { parseAvailability } from "../rules/dice.mjs";
-import { rollClassFromGrid, rollRandomLevel, rollProficiencyLevel } from "../rules/candidates.mjs";
+import { rollClassFromDistribution, rollTrajectoryFromDistribution, rollRandomLevel, rollProficiencyLevel } from "../rules/candidates.mjs";
 import { generateIdentity } from "../rules/identity.mjs";
 import { henchmanWage } from "../rules/wages.mjs";
 import { getTable } from "../rules/tables.mjs";
@@ -147,13 +147,22 @@ async function buildCandidates({ location, spec, total, marketClass, segment, pr
     }
 
     // Individuals: identity + fixed class/level per candidate (anti-fishing).
+    // CLASS ROLLS FIRST (bucket distribution, location rarity variant);
+    // culture/sex resolve downstream from the class registry.
+    const variant = location.system.classRarityTableId || "default";
     for (let i = 0; i < count; i++) {
       const candidate = { ...base, id: foundry.utils.randomID(), quantity: 1 };
       if (spec.kind === "henchman") {
         if ((spec.level ?? 0) > 0) {
-          const rolled = await rollClassFromGrid(rollDice);
+          const rolled = await rollClassFromDistribution(rollDice, variant);
           candidate.classKey = rolled.classKey;
           candidate.doubleD100 = rolled.rolls;
+        } else {
+          // 0th-level: trajectory bucket from the JJ 247 level-0 weights,
+          // class from the same bucket ladder ("level 0 have classes").
+          const traj = await rollTrajectoryFromDistribution(rollDice, variant);
+          candidate.classKey = traj.classKey;
+          candidate.doubleD100 = traj.rolls;
         }
         candidate.wageGp = henchmanWage(spec.level ?? 0);
       } else if (spec.kind === "henchmanByClass") {
@@ -166,9 +175,13 @@ async function buildCandidates({ location, spec, total, marketClass, segment, pr
         const lvl = await rollProficiencyLevel(rollDice, clampMarketClass(marketClass));
         candidate.level = lvl.level;
         if (lvl.level > 0) {
-          const cls = await rollClassFromGrid(rollDice);
+          const cls = await rollClassFromDistribution(rollDice, variant);
           candidate.classKey = cls.classKey;
           candidate.doubleD100 = cls.rolls;
+        } else {
+          const traj = await rollTrajectoryFromDistribution(rollDice, variant);
+          candidate.classKey = traj.classKey;
+          candidate.doubleD100 = traj.rolls;
         }
         candidate.notes = spec.proficiencyName
           ? `${spec.proficiencyName} ×${spec.proficiencyRanks ?? 1}`
@@ -186,8 +199,7 @@ async function buildCandidates({ location, spec, total, marketClass, segment, pr
         rand,
         demographics,
         level: candidate.level ?? 0,
-        classKey: candidate.classKey,
-        rollTrajectory: spec.kind !== "specialist",
+        classKey: spec.kind === "specialist" ? "" : candidate.classKey,
       });
       candidate.name = identity.name;
       candidate.gender = identity.gender;
