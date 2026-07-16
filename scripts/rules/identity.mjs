@@ -21,15 +21,45 @@ function pickWeighted(rand, entries, weightOf) {
   return entries[entries.length - 1];
 }
 
-/** Resolve a culture id from the location's demographics weights. */
-export function pickCulture(rand, demographics) {
-  const cultures = getTable("people", "cultures").list;
-  const weighted = (demographics ?? []).filter((d) => d.culture in cultures && d.weight > 0);
-  if (!weighted.length) {
-    const ids = Object.keys(cultures);
-    return ids[Math.floor(rand() * ids.length)];
+/** The race a class belongs to ("human" for everything unlisted). */
+export function raceForClass(classKey) {
+  const table = getTable("people", "classRaces").byRace;
+  const wanted = String(classKey ?? "").toLowerCase();
+  if (!wanted) return "human";
+  for (const [race, classes] of Object.entries(table)) {
+    if (classes.some((c) => wanted.includes(c) || c.includes(wanted))) return race;
   }
-  return pickWeighted(rand, weighted, (d) => d.weight).culture;
+  return "human";
+}
+
+/** The race of a culture ("human" when the entry declares none). */
+export function raceOfCulture(cultureId) {
+  return getTable("people", "cultures").list[cultureId]?.race ?? "human";
+}
+
+/**
+ * Resolve a culture id from the location's demographics weights,
+ * CONSTRAINED to a race so culture and class always align (no Zaharan
+ * humans, no elven vaultguards). Falls back to the race's own culture(s)
+ * when the demographics don't include one; Nobiran and other human-passing
+ * bloodlines use `classRaces.raceCultures`.
+ */
+export function pickCulture(rand, demographics, race = null) {
+  const cultures = getTable("people", "cultures").list;
+  const matchesRace = (id) => {
+    if (!race) return true;
+    if (race === "human") return raceOfCulture(id) === "human";
+    if (race === "nobiran") {
+      const allowed = getTable("people", "classRaces").raceCultures?.nobiran ?? [];
+      return allowed.includes(id);
+    }
+    return raceOfCulture(id) === race;
+  };
+  const weighted = (demographics ?? []).filter((d) => d.culture in cultures && d.weight > 0 && matchesRace(d.culture));
+  if (weighted.length) return pickWeighted(rand, weighted, (d) => d.weight).culture;
+  const ids = Object.keys(cultures).filter(matchesRace);
+  if (!ids.length) return Object.keys(cultures)[0];
+  return ids[Math.floor(rand() * ids.length)];
 }
 
 /** Full name per the culture's naming customs (patronym or surname). */
@@ -107,7 +137,12 @@ export function generateTrajectoryClass(rand, level) {
  */
 export function generateIdentity({ rand = Math.random, demographics = [], level = 0, classKey = "" } = {}) {
   const cultures = getTable("people", "cultures").list;
-  const culture = pickCulture(rand, demographics);
+  // Culture and class always align. With a class already fixed (leveled
+  // candidates), the class's race constrains the culture pick; without one
+  // (0th-level prospects), the culture comes first and steers the class
+  // trajectory — a dwarven prospect leans vaultguard, never witch.
+  const culture = pickCulture(rand, demographics, classKey ? raceForClass(classKey) : null);
+  const cultureRace = raceOfCulture(culture);
   const gender = rand() < 0.5 ? "male" : "female";
   const name = generateName(rand, culture, gender);
   let occupation = "";
@@ -117,8 +152,17 @@ export function generateIdentity({ rand = Math.random, demographics = [], level 
     const occ = generateOccupation(rand);
     occupation = occ.occupation;
     occupationCategory = occ.category;
-    // "Level 0 have classes": the trajectory they would advance into (JJ 247).
-    if (!resolvedClass) resolvedClass = generateTrajectoryClass(rand, 0);
+    // "Level 0 have classes": the trajectory they would advance into
+    // (JJ 247 for humans; the race's own classes for demihumans).
+    if (!resolvedClass) {
+      const demihuman = getTable("people", "demihumanTrajectories").byRace[cultureRace];
+      if (demihuman) {
+        const entries = Object.entries(demihuman);
+        resolvedClass = pickWeighted(rand, entries, ([, w]) => w)[0];
+      } else {
+        resolvedClass = generateTrajectoryClass(rand, 0);
+      }
+    }
   }
   return {
     name: name.full,
