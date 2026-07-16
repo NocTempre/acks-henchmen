@@ -187,6 +187,7 @@ async function buildCandidates({ location, spec, total, marketClass, segment, pr
         demographics,
         level: candidate.level ?? 0,
         classKey: candidate.classKey,
+        rollTrajectory: spec.kind !== "specialist",
       });
       candidate.name = identity.name;
       candidate.gender = identity.gender;
