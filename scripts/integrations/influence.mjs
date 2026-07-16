@@ -64,6 +64,7 @@ export function openLoyaltyViaInfluence(o) {
     targetActor: o.hireling ?? null,
     ctx: {
       effectiveLoyalty: o.effectiveLoyalty ?? 0,
+      apparentLevelDiff: o.apparentLevelDiff ?? 0,
       targetName: o.hireling?.name ?? "",
       targetImg: o.hireling?.img ?? "",
     },

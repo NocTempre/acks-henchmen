@@ -100,9 +100,17 @@ export class PostingDialog extends HandlebarsApplicationMixin(ApplicationV2) {
     if (kind === "mercenary") spec.troopType = data.troopType;
     if (kind === "specialist") spec.specialistType = data.specialistType;
 
-    // Employer level cap (RR 168) for leveled henchman searches.
+    // RR 168: candidates judge the employer by appearance and spending —
+    // the PRESENTED level (a lie, if it differs) governs who will sign on.
+    // Discovery later means a loyalty roll at −1 per level of difference.
+    const presented = data.presentedLevel !== "" && data.presentedLevel != null ? Number(data.presentedLevel) : null;
+    if (presented != null) spec.presentedLevel = presented;
+
+    // Employer level cap (RR 168) for leveled henchman searches — judged
+    // against the level the candidates BELIEVE the employer to be.
     if (employer && (kind === "henchman" || kind === "henchmanByClass") && (spec.level ?? 0) > 0) {
-      const cap = maxHenchmanLevel(adapter.getLevel(employer), !!data.domainRuler);
+      const believedLevel = presented ?? adapter.getLevel(employer);
+      const cap = maxHenchmanLevel(believedLevel, !!data.domainRuler);
       if (spec.level > cap) {
         ui.notifications.error(
           game.i18n.format("ACKS-HENCHMEN.posting.levelCapError", {

@@ -79,6 +79,10 @@ export default class HenchmanRecord extends foundry.abstract.DataModel {
         treasureShare: new fields.NumberField({ required: true, initial: 0.5 }),
         xpShare: new fields.NumberField({ required: true, initial: 0.5 }),
         signingBonusGp: num(),
+        // The employer level the hireling BELIEVES (RR 168 presented level);
+        // discovery of the truth prefills the loyalty roll's apparent-level
+        // penalty. null = hired honestly.
+        claimedEmployerLevel: num({ integer: true }),
         lastPaidTime: int(),
         arrearsGp: new fields.NumberField({ required: true, initial: 0 }),
         vassalDomain: new fields.BooleanField({ initial: false }),

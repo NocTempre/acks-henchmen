@@ -54,6 +54,10 @@ function postingField() {
     }),
     commissioned: new fields.BooleanField({ initial: false }),
     renew: new fields.BooleanField({ initial: false }), // roll a fresh pool at month end
+    // The level the employer PRESENTS as (RR 168: candidates judge by
+    // appearance and spending — lying is possible; discovery = loyalty
+    // roll at −1 per level of difference). null = honest.
+    presentedLevel: num({ integer: true, min: 0, max: 14 }),
     totalAvailable: int(0),
     rollDetail: str(),
     arrivalPlan: new fields.ArrayField(

@@ -10,7 +10,8 @@
  */
 import { MODULE_ID, SECONDS_PER_DAY, SECONDS_PER_WEEK } from "../constants.mjs";
 import { getTable } from "../rules/tables.mjs";
-import { processLocation } from "../engine/recruitment.mjs";
+import { processLocation, closePosting } from "../engine/recruitment.mjs";
+import { executeAsGM } from "../sockets.mjs";
 import { addSpecialHire, updateSpecialHire } from "../engine/hire.mjs";
 import { openPostingDialog } from "./posting-dialog.mjs";
 import { openRecruitDialog, openRecruitSpecial } from "./recruit-dialog.mjs";
@@ -117,21 +118,27 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     });
 
     // --- Paid searches ---
+    const myActorUuids = game.user.isGM
+      ? []
+      : game.actors.filter((a) => a.testUserPermission(game.user, "OWNER")).map((a) => a.uuid);
     context.postings = postings.map((p) => {
-      let employerName = "";
+      let employer = null;
       try {
-        employerName = p.employerUuid ? (fromUuidSync(p.employerUuid)?.name ?? "") : "";
+        employer = p.employerUuid ? fromUuidSync(p.employerUuid) : null;
       } catch {
         /* unresolved */
       }
+      const lied = p.presentedLevel != null && employer && p.presentedLevel !== (employer.system?.details?.level ?? null);
       return {
         ...p,
         specLabel: this.#specLabel(p.spec),
-        employerName,
+        employerName: employer?.name ?? "",
         feesTotal: (p.feesPaid ?? []).reduce((s, f) => s + f.gp, 0),
         statusLabel: game.i18n.localize(`ACKS-HENCHMEN.posting.status.${p.status}`),
         isActive: p.status === "active",
         isPrivate: !p.segment,
+        isMine: game.user.isGM || myActorUuids.includes(p.employerUuid),
+        liedLevel: game.user.isGM && lied ? p.presentedLevel : null,
       };
     });
 
@@ -316,9 +323,20 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     await advanceDays(7);
   }
 
+  /** Take a notice down. Players relay through the GM socket (they cannot
+   *  write the location actor); ownership of the posting is enforced there. */
   static async #onClosePosting(_event, target) {
     const posting = this.#posting(target);
-    if (posting) await this.#updatePosting(posting.id, { status: "closed" });
+    if (!posting) return;
+    if (game.user.isGM) {
+      await closePosting(this.actor, posting.id);
+    } else {
+      await executeAsGM("closePosting", {
+        locationUuid: this.actor.uuid,
+        postingId: posting.id,
+        requestUserId: game.user.id,
+      });
+    }
   }
 
   static async #onTogglePlayerDetails(_event, target) {

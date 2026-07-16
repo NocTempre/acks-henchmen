@@ -139,24 +139,24 @@
           <th>{{localize "ACKS-HENCHMEN.posting.employer"}}</th>
           <th>{{localize "ACKS-HENCHMEN.posting.fees"}}</th>
           <th>{{localize "ACKS-HENCHMEN.posting.statusHeader"}}</th>
-          {{#if isGM}}<th></th>{{/if}}
+          <th></th>
         </tr>
       </thead>
       <tbody>
         {{#each postings}}
         <tr data-posting-id="{{id}}" class="{{#unless isActive}}inactive{{/unless}}">
-          <td data-tooltip="{{rollDetail}}">{{specLabel}}{{#if isPrivate}} <i class="fas fa-user-lock" data-tooltip="{{localize 'ACKS-HENCHMEN.posting.privateHint'}}"></i>{{/if}}{{#if commissioned}} <i class="fas fa-scroll" data-tooltip="{{localize 'ACKS-HENCHMEN.posting.commissioned'}}"></i>{{/if}}</td>
+          <td data-tooltip="{{rollDetail}}">{{specLabel}}{{#if isPrivate}} <i class="fas fa-user-lock" data-tooltip="{{localize 'ACKS-HENCHMEN.posting.privateHint'}}"></i>{{/if}}{{#if commissioned}} <i class="fas fa-scroll" data-tooltip="{{localize 'ACKS-HENCHMEN.posting.commissioned'}}"></i>{{/if}}{{#if liedLevel}} <i class="fas fa-mask" data-tooltip="{{localize 'ACKS-HENCHMEN.posting.liedLevel'}} {{liedLevel}}"></i>{{/if}}</td>
           <td>{{employerName}}</td>
           <td>{{feesTotal}} gp</td>
           <td>{{statusLabel}}</td>
-          {{#if @root.isGM}}
           <td class="row-actions">
+            {{#if @root.isGM}}
             <a data-action="togglePlayerDetails" data-tooltip="{{localize 'ACKS-HENCHMEN.posting.toggleDetails'}}"><i class="fas {{#if playersSeeDetails}}fa-eye{{else}}fa-eye-slash{{/if}}"></i></a>
-            {{#if isActive}}
-            <a data-action="closePosting" data-tooltip="{{localize 'ACKS-HENCHMEN.posting.close'}}"><i class="fas fa-xmark"></i></a>
             {{/if}}
+            {{#if isActive}}{{#if isMine}}
+            <a data-action="closePosting" data-tooltip="{{localize 'ACKS-HENCHMEN.posting.close'}}"><i class="fas fa-xmark"></i></a>
+            {{/if}}{{/if}}
           </td>
-          {{/if}}
         </tr>
         {{/each}}
       </tbody>

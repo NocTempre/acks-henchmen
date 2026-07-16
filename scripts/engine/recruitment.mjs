@@ -36,6 +36,7 @@ import { henchmanWage } from "../rules/wages.mjs";
 import { getTable } from "../rules/tables.mjs";
 import { sumEffectModifiers } from "../effects.mjs";
 import * as adapter from "../acks-adapter.mjs";
+import { registerSocketAction } from "../sockets.mjs";
 import { now, secondsPerMonth } from "../time.mjs";
 
 /** Foundry dice bridge for the pure rules functions. */
@@ -292,8 +293,11 @@ async function chargeWeeklyFee(location, employer) {
  * specification per recruiter, at the recruiter's effective market class,
  * capped by base henchman availability).
  */
-export async function createPosting(location, spec, employer, { dedicatedSearcherUuid = "", playersSeeDetails = true } = {}) {
+export async function createPosting(location, rawSpec, employer, { dedicatedSearcherUuid = "", playersSeeDetails = true } = {}) {
   const currentTime = now();
+  // presentedLevel travels on the POSTING (RR 168 lie), not the spec — keep
+  // it out of spec comparisons and storage.
+  const { presentedLevel = null, ...spec } = rawSpec;
   const isPrivate = PRIVATE_KINDS.includes(spec.kind);
   const segment = isPrivate ? "" : segmentKeyFor(spec);
 
@@ -331,6 +335,7 @@ export async function createPosting(location, spec, employer, { dedicatedSearche
     segment,
     employerUuid: employer?.uuid ?? "",
     dedicatedSearcherUuid,
+    presentedLevel,
     spec,
     commissioned: !!spec.commissioned,
     totalAvailable: 0,
@@ -548,6 +553,33 @@ export async function processLocation(location, currentTime = now()) {
   }
   return { changed, arrived: [...arrivals.values()].reduce((s, n) => s + n, 0) };
 }
+
+/**
+ * Close a posting (take a notice down). Players own their own posts but
+ * cannot write the location actor, so non-GM calls relay through the GM
+ * socket ("closePosting") — only the posting employer's owner or a GM may
+ * close it.
+ */
+export async function closePosting(location, postingId, { requestUserId = null } = {}) {
+  const postings = (location.system.postings ?? []).map((p) => p.toObject?.() ?? foundry.utils.deepClone(p));
+  const posting = postings.find((p) => p.id === postingId);
+  if (!posting) return { error: "no-posting" };
+  if (requestUserId) {
+    const user = game.users.get(requestUserId);
+    const employer = posting.employerUuid ? await fromUuid(posting.employerUuid).catch(() => null) : null;
+    const employerActor = employer?.actor ?? employer;
+    const allowed = user?.isGM || (employerActor && employerActor.testUserPermission(user, "OWNER"));
+    if (!allowed) return { error: "not-yours" };
+  }
+  posting.status = "closed";
+  await location.update({ "system.postings": postings });
+  return { posting };
+}
+
+registerSocketAction("closePosting", async ({ locationUuid, postingId, requestUserId }) => {
+  const location = await fromUuid(locationUuid);
+  if (location) await closePosting(location.actor ?? location, postingId, { requestUserId });
+});
 
 /** Process every location actor in the world (GM-side time hook target). */
 export async function processAllLocations(currentTime = now()) {

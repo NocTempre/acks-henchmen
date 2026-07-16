@@ -1,4 +1,4 @@
-/* global game, ui, foundry, Roll, Hooks, ChatMessage, Actor */
+/* global game, ui, foundry, Roll, Hooks, ChatMessage, Actor, CONST */
 /**
  * Candidate rolling (feature 4 — record the results, generation is a future
  * module) and the hire pipeline.
@@ -14,6 +14,32 @@ import { now } from "../time.mjs";
 
 async function roll(formula) {
   return (await new Roll(formula).evaluate()).total;
+}
+
+/**
+ * Ownership grant so the hireling is VISIBLE to whoever hired it: every
+ * player who owns the employer actor becomes owner of the hireling.
+ */
+export function employerOwnership(employer) {
+  const OWNER = CONST.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3;
+  return Object.fromEntries(
+    Object.entries(employer?.ownership ?? {})
+      .filter(([id, level]) => id !== "default" && level >= OWNER)
+      .map(([id]) => [id, OWNER])
+  );
+}
+
+/** The employer level the candidate was shown (RR 168 presented level). */
+function claimedLevelFor(location, candidate, employer) {
+  const postings = location.system.postings ?? [];
+  const posting = postings.find(
+    (p) =>
+      p.status === "active" &&
+      p.employerUuid === employer.uuid &&
+      (candidate.privateToUuid ? !p.segment : p.segment === candidate.segment)
+  );
+  const presented = posting?.presentedLevel;
+  return presented != null && presented !== adapter.getLevel(employer) ? presented : null;
 }
 
 /** Update one candidate record inside a location actor. */
@@ -85,6 +111,8 @@ export async function hireExistingActor(location, specialHireId, employer, opts 
     const { hireMonster } = await import("./monster.mjs");
     result = await hireMonster(target, employer, { ...opts });
   } else {
+    // Visibility: the hiring player(s) become owners of their new hireling.
+    await target.update({ ownership: { ...target.ownership, ...employerOwnership(employer) } });
     const loyaltyStart = startingLoyalty({ base: opts.baseLoyalty ?? 0, elan: !!opts.elan });
     const wage = Number(target.system?.retainer?.wage) || henchmanWage(adapter.getWageLevel(target));
     await adapter.setRetainer(target, {
@@ -219,6 +247,7 @@ export async function hire(location, candidateId, employer, opts = {}) {
   const actorData = {
     name: candidate.name || game.i18n.localize("ACKS-HENCHMEN.candidate.unnamed"),
     type: "character",
+    ownership: employerOwnership(employer),
     prototypeToken: { actorLink: true },
     system: {
       retainer: {
@@ -282,6 +311,7 @@ export async function hire(location, candidateId, employer, opts = {}) {
       wageGp: candidate.wageGp ?? null,
       wageBasis: category === "mercenary" ? "mercenary" : category === "specialist" ? "specialist" : "level",
       signingBonusGp: opts.signingBonusGp ?? null,
+      claimedEmployerLevel: claimedLevelFor(location, candidate, employer),
       lastPaidTime: now(),
     },
     loyalty: { start: loyaltyStart, permanents: [] },

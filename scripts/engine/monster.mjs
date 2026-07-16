@@ -115,6 +115,10 @@ export async function hireMonster(monster, employer, opts = {}) {
     irrefusable: opts.irrefusable ?? null,
   });
 
+  // Visibility: the hiring player(s) become owners of the monster hireling.
+  const { employerOwnership } = await import("./hire.mjs");
+  await monster.update({ ownership: { ...monster.ownership, ...employerOwnership(employer) } });
+
   await adapter.setRetainer(monster, {
     enabled: true,
     loyalty: loyaltyStart,

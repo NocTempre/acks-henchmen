@@ -111,6 +111,14 @@ export async function applyLoyaltyOutcome(actor, { outcome, total = null, note =
 export function openLoyaltyRoll(actor, opts = {}) {
   const employer = adapter.getManager(actor);
 
+  // RR 168 presented-level lie: once the hireling has cause to doubt, the
+  // roll takes −1 per level of difference between what was CLAIMED at hire
+  // and the truth — auto-applied, GM-overridable like every derived value.
+  const record = actor.getFlag(MODULE_ID, FLAG_RECORD) ?? {};
+  const claimed = record.terms?.claimedEmployerLevel;
+  const apparentLevelDiff =
+    claimed != null && employer ? Math.max(0, claimed - adapter.getLevel(employer)) : 0;
+
   // Influence-hosted page (loyalty is secret: open GM-side; the completion
   // hook routes back through applyLoyaltyOutcome via the integration).
   try {
@@ -121,6 +129,7 @@ export function openLoyaltyRoll(actor, opts = {}) {
         employer,
         hireling: actor,
         effectiveLoyalty: effectiveLoyaltyFor(actor),
+        apparentLevelDiff,
         context: { actorUuid: actor.uuid, reason: opts.reason ?? "" },
       });
       return;
@@ -133,7 +142,7 @@ export function openLoyaltyRoll(actor, opts = {}) {
   openThrowDialog("hirelingLoyalty", {
     title: opts.title ?? `${actor.name}${opts.reason ? ` (${opts.reason})` : ""}`,
     actor,
-    derived: { effectiveLoyalty: effectiveLoyaltyFor(actor) },
+    derived: { effectiveLoyalty: effectiveLoyaltyFor(actor), apparentLevelDiff },
     dynamicModifiers,
     onResolve: (result) => applyLoyaltyOutcome(actor, { outcome: result.outcome, total: result.total, note: opts.reason ?? "" }),
   });
