@@ -2,7 +2,7 @@
   "id": "acks-henchmen",
   "title": "ACKS II — Henchmen & Hirelings",
   "description": "Completes the ACKS II hireling ruleset: market-class availability rolling, recruitment postings with time tracking, a player-facing recruitment board, hiring negotiation (Reaction to Hiring Offer), henchman stat/class/level rolling with recorded results, loyalty & morale automation (calamities, level-up loyalty rolls, obedience, wages), monstrous henchmen, followers, and optional slavery rules. Modifiers are data-driven: Active Effects on proficiency/power items feed every roll.",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "socket": true,
   "compatibility": {
     "minimum": "14",
