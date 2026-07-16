@@ -122,10 +122,24 @@ export function generateAge(rand, level, classKey) {
   return base + variance;
 }
 
-/** 0th-level occupation from the weighted category lists (JJ 254-257). */
-export function generateOccupation(rand) {
-  const categories = getTable("people", "occupations").categories;
-  const category = pickWeighted(rand, categories, (c) => c.weight);
+/**
+ * 0th-level occupation. Humans roll the JJ 254-257 profession lists; races
+ * with their own society table (occupations.byRace — dwarves roll CASTE per
+ * the BTA ethnicity text) use it instead. A category with no entries (the
+ * dwarven Oathsworn) means the occupation IS the sworn order — the class
+ * trajectory carries it, and the caste label alone is recorded.
+ */
+export function generateOccupation(rand, race = "human") {
+  const table = getTable("people", "occupations");
+  const raceTable = table.byRace?.[race];
+  if (raceTable) {
+    const category = pickWeighted(rand, raceTable.categories, (c) => c.weight);
+    const occupation = category.entries.length
+      ? `${category.label}: ${pick(rand, category.entries)}`
+      : category.label;
+    return { category: category.id, occupation };
+  }
+  const category = pickWeighted(rand, table.categories, (c) => c.weight);
   return { category: category.id, occupation: pick(rand, category.entries) };
 }
 
@@ -159,7 +173,7 @@ export function generateIdentity({ rand = Math.random, demographics = [], level 
   let occupation = "";
   let occupationCategory = "";
   if ((level ?? 0) <= 0) {
-    const occ = generateOccupation(rand);
+    const occ = generateOccupation(rand, raceOfCulture(culture));
     occupation = occ.occupation;
     occupationCategory = occ.category;
   }
