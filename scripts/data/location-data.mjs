@@ -46,6 +46,7 @@ function postingField() {
       classKey: str(),
       rarityOverride: str(),
       levelShift: int(0),
+      alignmentShift: int(0),
       proficiencyName: str(),
       proficiencyRanks: num({ integer: true, min: 1, max: 3 }),
       troopType: str(),
@@ -165,6 +166,14 @@ export class LocationData extends foundry.abstract.TypeDataModel {
       urbanFamilies: num({ integer: true, min: 0 }),
       domainUuid: str(),
       classRarityTableId: new fields.StringField({ required: true, initial: "default" }),
+      // Settlement alignment: directed searches for opposed-alignment classes
+      // shift one rarity step (alignmentRecruitment table); the default
+      // ladders encode a lawful town, other alignments override via variant.
+      settlementAlignment: new fields.StringField({
+        required: true,
+        initial: "lawful",
+        choices: ["lawful", "neutral", "chaotic"],
+      }),
       desertRealm: new fields.BooleanField({ initial: false }), // camel troops available
       compositeVariant: new fields.StringField({
         required: true,

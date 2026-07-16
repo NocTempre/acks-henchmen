@@ -31,7 +31,7 @@ import {
 } from "../rules/availability.mjs";
 import { parseAvailability } from "../rules/dice.mjs";
 import { rollClassFromDistribution, rollTrajectoryFromDistribution, rollRandomLevel, rollProficiencyLevel } from "../rules/candidates.mjs";
-import { generateIdentity } from "../rules/identity.mjs";
+import { generateIdentity, classInfo } from "../rules/identity.mjs";
 import { henchmanWage } from "../rules/wages.mjs";
 import { getTable } from "../rules/tables.mjs";
 import { sumEffectModifiers } from "../effects.mjs";
@@ -296,6 +296,16 @@ export async function createPosting(location, spec, employer, { dedicatedSearche
   const currentTime = now();
   const isPrivate = PRIVATE_KINDS.includes(spec.kind);
   const segment = isPrivate ? "" : segmentKeyFor(spec);
+
+  // Alignment openness (directed class searches): an opposed-alignment
+  // class is harder to recruit openly — rarity shift per the table.
+  if (spec.kind === "henchmanByClass" && !spec.alignmentShift) {
+    const classAlignment = classInfo(spec.classKey)?.alignment;
+    if (classAlignment) {
+      const shifts = getTable("rarity", "alignmentRecruitment").shifts;
+      spec.alignmentShift = shifts[location.system.settlementAlignment ?? "lawful"]?.[classAlignment] ?? 0;
+    }
+  }
 
   // Duplicate checks: one active search per employer per segment / spec-month.
   const postings = (location.system.postings ?? []).map((p) => p.toObject?.() ?? foundry.utils.deepClone(p));

@@ -119,6 +119,9 @@ export async function rollMonthlyPool(spec, marketClass, rollDice, rand = Math.r
       let tier = spec.rarityOverride ?? classRarity(spec.classKey, rarityVariant);
       if (!tier) return { error: "unknown-class" };
       if (spec.levelShift) tier = shiftRarity(tier, spec.levelShift);
+      // Alignment openness: recruiting an opposed-alignment class openly is
+      // harder (chaotic warlocks in a lawful town) — shift per the table.
+      if (spec.alignmentShift) tier = tier ? shiftRarity(tier, spec.alignmentShift) : tier;
       if (spec.commissioned) tier = shiftRarity(tier, -1) ?? tier;
       if (!tier) return { error: "past-legendary" };
       const expr = rarityExpr(tier, mc);
