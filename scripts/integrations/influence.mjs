@@ -2,17 +2,23 @@
 /**
  * acks-influence integration (soft — everything is guarded).
  *
- * Consumed:
- *  - `flags.acks-influence.reaction` Active Effects already feed hiring
- *    throws (scripts/effects.mjs).
- *  - `acksInfluenceRollComplete` → influence rolls made AGAINST a managed
- *    hireling are logged into its HenchmanRecord event log.
- *  - `api.open(actor, {modifiers})` → `openInfluenceFor()` opens the roller
- *    with the location's slander penalty pre-injected.
+ * With acks-influence v1.3.0+ (apiVersion 3) the HIRING and LOYALTY rolls
+ * render inside the influence app as external-mode pages (consistent UI,
+ * auto-derived subject/target features, effect-granted modifiers, the
+ * three core tones hidden). This module supplies ctx (signing-bonus
+ * options, refusal/slander counts, effective loyalty) and applies the
+ * consequences when `acksInfluenceRollComplete` fires with our context.
+ * Without influence (or on an older apiVersion) everything falls back to
+ * the module's own ThrowDialog.
+ *
+ * Also consumed: `flags.acks-influence.reaction` Active Effects feed hiring
+ * throws (scripts/effects.mjs); influence rolls AGAINST managed hirelings
+ * are logged into their HenchmanRecord.
  */
 import { MODULE_ID } from "../constants.mjs";
 import HenchmanRecord from "../data/henchman-record.mjs";
 import * as adapter from "../acks-adapter.mjs";
+import { executeAsGM } from "../sockets.mjs";
 
 const INFLUENCE_ID = "acks-influence";
 
@@ -21,10 +27,114 @@ export function influenceApi() {
   return module?.active ? module.api : null;
 }
 
+/** True when influence can host the hiring/loyalty pages (apiVersion 3+). */
+export function hostsModes() {
+  return (influenceApi()?.apiVersion ?? 0) >= 3;
+}
+
 /**
- * Open the influence roller for an employer, injecting the location's
- * refuse-and-slander penalty as an external modifier (RR 162: the -1 applies
- * to ALL further reaction rolls the party makes in that town/region).
+ * Open the Reaction to Hiring Offer as an influence-hosted page.
+ * @param {object} o - { employer, targetActor, targetName, targetImg,
+ *   signingBonusOptions, signingTiers, previousRefusals, slanderCount,
+ *   context } — context is echoed back on the completion hook.
+ */
+export function openHiringViaInfluence(o) {
+  const api = influenceApi();
+  if (!api) return null;
+  return api.open(o.employer, {
+    mode: "hiring",
+    targetActor: o.targetActor ?? null,
+    ctx: {
+      signingBonusOptions: o.signingBonusOptions ?? [],
+      previousRefusals: o.previousRefusals ?? 0,
+      slanderCount: o.slanderCount ?? 0,
+      targetName: o.targetName ?? "",
+      targetImg: o.targetImg ?? "",
+    },
+    context: { module: MODULE_ID, ...o.context },
+  });
+}
+
+/** Open the secret Hireling Loyalty roll as an influence-hosted page. */
+export function openLoyaltyViaInfluence(o) {
+  const api = influenceApi();
+  if (!api) return null;
+  return api.open(o.employer ?? null, {
+    mode: "loyalty",
+    targetActor: o.hireling ?? null,
+    ctx: {
+      effectiveLoyalty: o.effectiveLoyalty ?? 0,
+      targetName: o.hireling?.name ?? "",
+      targetImg: o.hireling?.img ?? "",
+    },
+    context: { module: MODULE_ID, ...o.context },
+  });
+}
+
+/** The signing-bonus tier (+1..+3) chosen on an influence-hosted roll. */
+export function signingTierFromParts(parts) {
+  const entry = (parts ?? []).find((p) => /signing/i.test(p.label ?? "") || p.key === "signingBonus");
+  return Number(entry?.value) || 0;
+}
+
+export function registerInfluenceIntegration() {
+  if (!game.modules.get(INFLUENCE_ID)?.active) return;
+
+  Hooks.on("acksInfluenceRollComplete", async (payload) => {
+    try {
+      const context = payload?.context;
+      // --- Our hosted pages: apply the consequences ---
+      if (context?.module === MODULE_ID) {
+        if (payload.mode === "hiring") {
+          const signingTier = signingTierFromParts(payload.parts);
+          const signingGp = signingTier > 0 ? (context.signingTiers?.[signingTier] ?? 0) : 0;
+          await executeAsGM("hiringOutcome", {
+            locationUuid: context.locationUuid,
+            candidateId: context.candidateId ?? null,
+            specialHireId: context.specialHireId ?? null,
+            employerUuid: context.employerUuid,
+            result: { outcome: payload.outcome, natural: payload.natural, total: payload.total, parts: payload.parts },
+            signingGp,
+          });
+        } else if (payload.mode === "loyalty") {
+          // Loyalty pages open on the GM client; apply directly there.
+          const { applyLoyaltyOutcome } = await import("../engine/events.mjs");
+          const actor = context.actorUuid ? await fromUuid(context.actorUuid) : null;
+          if (actor) {
+            await applyLoyaltyOutcome(actor.actor ?? actor, {
+              outcome: payload.outcome,
+              total: payload.total,
+              note: context.reason ?? "",
+            });
+          }
+        }
+        return;
+      }
+      // --- Core-tone rolls against managed hirelings: log them ---
+      const target = payload?.target;
+      if (!target || !adapter.isRetainer(target)) return;
+      if (game.user !== game.users.activeGM) return;
+      await HenchmanRecord.logEvent(target, {
+        type: "adjustment",
+        note: game.i18n.format("ACKS-HENCHMEN.influence.rollNote", {
+          name: payload.actor?.name ?? "?",
+          tone: payload.tone ?? payload.mode ?? "",
+          band: payload.band ?? payload.outcome ?? "",
+          attitude: payload.newAttitude ?? "",
+        }),
+        rollTotal: payload.total,
+        outcome: payload.band ?? payload.outcome ?? "",
+      });
+    } catch (err) {
+      console.warn(`${MODULE_ID} | acksInfluenceRollComplete handling failed`, err);
+    }
+  });
+  console.log(`${MODULE_ID} | acks-influence integration active (hostsModes: ${hostsModes()})`);
+}
+
+/**
+ * Open the core influence roller for an employer with the location's
+ * slander penalty injected (RR 162's town-wide −1).
  */
 export function openInfluenceFor(employer, location = null, targetActor = null) {
   const api = influenceApi();
@@ -37,31 +147,5 @@ export function openInfluenceFor(employer, location = null, targetActor = null) 
       value: -slanderCount,
     });
   }
-  // apiVersion 2 accepts an options object; older versions ignore it safely.
   return api.open(employer, { targetActor, modifiers });
-}
-
-export function registerInfluenceIntegration() {
-  if (!game.modules.get(INFLUENCE_ID)?.active) return;
-  // Log influence rolls targeting managed hirelings into their record.
-  Hooks.on("acksInfluenceRollComplete", async ({ actor, target, tone, total, band, newAttitude }) => {
-    try {
-      if (!target || !adapter.isRetainer(target)) return;
-      if (game.user !== game.users.activeGM) return;
-      await HenchmanRecord.logEvent(target, {
-        type: "adjustment",
-        note: game.i18n.format("ACKS-HENCHMEN.influence.rollNote", {
-          name: actor?.name ?? "?",
-          tone,
-          band,
-          attitude: newAttitude,
-        }),
-        rollTotal: total,
-        outcome: band,
-      });
-    } catch (err) {
-      console.warn(`${MODULE_ID} | influence rollComplete logging failed`, err);
-    }
-  });
-  console.log(`${MODULE_ID} | acks-influence integration active`);
 }

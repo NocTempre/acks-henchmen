@@ -167,6 +167,47 @@
   </details>
 
   <details class="section" open>
+    <summary>{{localize "ACKS-HENCHMEN.special.header"}} ({{specialHires.length}})</summary>
+    <p class="hint">{{localize "ACKS-HENCHMEN.special.hint"}}</p>
+    {{#if specialHires.length}}
+    <table class="candidates-table">
+      <thead>
+        <tr>
+          <th>{{localize "ACKS-HENCHMEN.candidate.name"}}</th>
+          <th>{{localize "ACKS-HENCHMEN.special.origin.header"}}</th>
+          <th>{{localize "ACKS-HENCHMEN.special.limit"}}</th>
+          <th>{{localize "ACKS-HENCHMEN.special.refusals"}}</th>
+          <th>{{localize "ACKS-HENCHMEN.candidate.statusHeader"}}</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#each specialHires}}
+        <tr data-special-id="{{id}}" class="status-{{status}}">
+          <td><img class="special-portrait" src="{{img}}" alt="" /> {{name}}</td>
+          <td>{{originLabel}}</td>
+          <td>{{limitLabel}}</td>
+          <td>{{refusalCount}}</td>
+          <td>{{statusLabel}}</td>
+          <td class="row-actions">
+            {{#if isAvailable}}
+            <a data-action="recruitSpecial" data-tooltip="{{localize 'ACKS-HENCHMEN.candidate.recruit'}}"><i class="fas fa-handshake"></i></a>
+            {{/if}}
+            {{#if @root.isGM}}
+            <a data-action="setSpecialLimit" data-tooltip="{{localize 'ACKS-HENCHMEN.special.setLimit'}}"><i class="fas fa-hourglass-half"></i></a>
+            <a data-action="removeSpecial" data-tooltip="{{localize 'ACKS-HENCHMEN.candidate.remove'}}"><i class="fas fa-trash"></i></a>
+            {{/if}}
+          </td>
+        </tr>
+        {{/each}}
+      </tbody>
+    </table>
+    {{else}}
+    <p class="hint">{{localize "ACKS-HENCHMEN.special.empty"}}</p>
+    {{/if}}
+  </details>
+
+  <details class="section" open>
     <summary>{{localize "ACKS-HENCHMEN.location.candidates"}} ({{candidateCount}})</summary>
     {{#if candidateCount}}
     <div class="candidate-filter">

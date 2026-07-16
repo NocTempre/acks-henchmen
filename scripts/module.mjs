@@ -22,9 +22,9 @@ import HenchmanRecord from "./data/henchman-record.mjs";
 import { LocationSheet } from "./apps/location-sheet.mjs";
 import { ThrowDialog, openThrowDialog } from "./apps/throw-dialog.mjs";
 import { openPostingDialog } from "./apps/posting-dialog.mjs";
-import { openRecruitDialog } from "./apps/recruit-dialog.mjs";
+import { openRecruitDialog, openRecruitSpecial } from "./apps/recruit-dialog.mjs";
 import { createPosting, processLocation, processAllLocations, effectiveMarketClass } from "./engine/recruitment.mjs";
-import { hire, checkHenchmanLimit } from "./engine/hire.mjs";
+import { hire, checkHenchmanLimit, addSpecialHire, hireExistingActor } from "./engine/hire.mjs";
 import * as candidateRules from "./rules/candidates.mjs";
 import * as identityRules from "./rules/identity.mjs";
 import { onTimeAdvanced, advanceDays, now } from "./time.mjs";
@@ -36,7 +36,8 @@ import { recruitMonster, hireMonster, validateMonsterRecruit } from "./engine/mo
 import { openFollowersDialog } from "./apps/followers-dialog.mjs";
 import * as slaveryRules from "./rules/slavery.mjs";
 import * as facts from "./facts.mjs";
-import { registerInfluenceIntegration, openInfluenceFor } from "./integrations/influence.mjs";
+import * as influenceIntegration from "./integrations/influence.mjs";
+const { registerInfluenceIntegration, openInfluenceFor } = influenceIntegration;
 
 Hooks.once("init", () => {
   console.log(`${MODULE_ID} | Initializing`);
@@ -103,6 +104,7 @@ Hooks.once("setup", async () => {
     validateMonsterRecruit,
     openFollowersDialog,
     openInfluenceFor,
+    integrations: { influence: influenceIntegration },
     facts,
     // engine
     createPosting,
@@ -111,6 +113,11 @@ Hooks.once("setup", async () => {
     effectiveMarketClass,
     hire,
     checkHenchmanLimit,
+    // special hires (real actors: GM-placed or found on adventures)
+    addSpecialHire,
+    registerFoundRecruit: (location, actor, opts = {}) => addSpecialHire(location, actor, { ...opts, origin: "found" }),
+    hireExistingActor,
+    openRecruitSpecial,
     // data
     HenchmanRecord,
     getRecord: (actor) => HenchmanRecord.fromActor(actor),

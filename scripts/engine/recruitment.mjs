@@ -471,6 +471,16 @@ export async function processLocation(location, currentTime = now()) {
   );
   if (candidates.length !== before) changed = true;
 
+  // 1c. Special hires: expire entries past their time limit (GM entries
+  // default to none; found recruits default to the market month's end).
+  const specialHires = (sys.specialHires ?? []).map((s) => s.toObject?.() ?? foundry.utils.deepClone(s));
+  for (const entry of specialHires) {
+    if (entry.status === "available" && entry.expiresTime > 0 && currentTime >= entry.expiresTime) {
+      entry.status = "expired";
+      changed = true;
+    }
+  }
+
   // 2. Weekly fees per active posting (fee per week per type searched).
   for (const posting of postings) {
     if (posting.status !== "active") continue;
@@ -526,6 +536,7 @@ export async function processLocation(location, currentTime = now()) {
       "system.candidates": candidates,
       "system.marketRolls": marketRolls,
       "system.monthAnchorTime": monthAnchorTime,
+      "system.specialHires": specialHires,
       "system.searchLedger": ledger,
     });
     for (const [segment, count] of arrivals) {

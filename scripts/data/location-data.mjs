@@ -207,6 +207,35 @@ export class LocationData extends foundry.abstract.TypeDataModel {
       schemaVersion: int(1),
       postings: new fields.ArrayField(postingField()),
       candidates: new fields.ArrayField(candidateField()),
+      // Special hires: REAL actors the GM drags in (notable NPCs for hire)
+      // plus recruits the party FOUND on adventures (RR 162). GM entries
+      // stay available until an optional time limit; found recruits default
+      // to end of the market month (RAW gives no fixed window — Judge's
+      // call). Hiring attempts are tracked per NPC in `refusals`.
+      specialHires: new fields.ArrayField(
+        new fields.SchemaField({
+          id: str(),
+          actorUuid: str(),
+          name: str(),
+          img: str(),
+          addedTime: int(),
+          expiresTime: int(0), // 0 = no limit
+          origin: new fields.StringField({ required: true, initial: "gm", choices: ["gm", "found"] }),
+          status: new fields.StringField({
+            required: true,
+            initial: "available",
+            choices: ["available", "hired", "expired"],
+          }),
+          refusals: new fields.ArrayField(
+            new fields.SchemaField({
+              employerUuid: str(),
+              time: int(),
+              result: str(),
+            })
+          ),
+          notes: str(),
+        })
+      ),
       slander: new fields.ArrayField(
         new fields.SchemaField({
           partyKey: str(), // employer uuid or party label the penalty applies to

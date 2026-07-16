@@ -260,6 +260,14 @@
   font-size: 0.75em;
 }
 
+.acks-henchmen.location-sheet .special-portrait {
+  width: 22px;
+  height: 22px;
+  border: none;
+  object-fit: cover;
+  vertical-align: middle;
+}
+
 .acks-henchmen.location-sheet .row-actions {
   white-space: nowrap;
 }

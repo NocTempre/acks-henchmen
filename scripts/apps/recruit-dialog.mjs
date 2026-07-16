@@ -1,26 +1,22 @@
 /* global game, ui, foundry, ChatMessage, Hooks */
 /**
- * Recruit flow — opens the Reaction to Hiring Offer throw (RR 162) for one
- * candidate, with every modifier explained:
- *   - employer CHA (auto, derived)
- *   - effect-driven bonuses from proficiency/power Items (Diplomacy,
- *     Intimidation, Mystic Aura, Seduction, Bribery…) via effects.mjs —
- *     situational ones arrive as toggles
- *   - signing bonus tiers priced from the candidate's wage (Bribery
- *     proficiency changes the price scale, RR 162 + GM screen)
- *   - cumulative −1 per previous refusal by this party (auto)
- *   - −1 per refuse-and-slander entry in this town (auto)
- * Outcome handling: accept/élan → hire; try again → logged (sweeten the deal
- * and re-open); refuse → logged; refuse & slander → slander registry + the
- * candidate is permanently off-limits to the party.
+ * Recruit flow — the Reaction to Hiring Offer (RR 162) for market candidates
+ * AND special hires (real actors). When acks-influence v1.3+ is active the
+ * roll renders as an influence-hosted "hiring" page (consistent UI, auto
+ * subject/target detection, core tones hidden); otherwise the module's own
+ * ThrowDialog carries it. Every attempt is tracked PER NPC (refusals build
+ * the cumulative −1; refuse-and-slander blocks the party permanently).
+ * Mutations (actor creation, location writes) execute on the GM client.
  */
-import { HOOKS } from "../constants.mjs";
+import { MODULE_ID, HOOKS } from "../constants.mjs";
 import { openThrowDialog } from "./throw-dialog.mjs";
 import { collectEffectModifiers, toDialogModifiers } from "../effects.mjs";
 import { signingBonusCost } from "../rules/wages.mjs";
-import { hire, updateCandidate } from "../engine/hire.mjs";
+import { henchmanWage } from "../rules/wages.mjs";
+import { hire, updateCandidate, hireExistingActor, updateSpecialHire } from "../engine/hire.mjs";
 import * as adapter from "../acks-adapter.mjs";
 import { executeAsGM, registerSocketAction } from "../sockets.mjs";
+import { hostsModes, openHiringViaInfluence } from "../integrations/influence.mjs";
 import { now } from "../time.mjs";
 
 function hasBribery(employer) {
@@ -47,11 +43,94 @@ async function pickEmployer(preferred) {
   return id ? game.actors.get(id) : null;
 }
 
-/**
- * @param {Actor} location - the location actor
- * @param {string} candidateId
- * @param {Actor} [preferredEmployer]
- */
+/** Signing-bonus tiers priced from the wage and Bribery (RR 162 + screen). */
+function signingSetup(employer, wage) {
+  const bribery = hasBribery(employer);
+  const options = [{ label: game.i18n.localize("ACKS-HENCHMEN.mod.signingBonusNone"), value: 0 }];
+  const tiers = {};
+  for (const tier of [1, 2, 3]) {
+    const cost = signingBonusCost(tier, wage, bribery);
+    if (!cost) continue;
+    tiers[tier] = cost.gp;
+    options.push({
+      label: game.i18n.format("ACKS-HENCHMEN.mod.signingBonusTierLabel", {
+        gp: cost.gp,
+        wages: game.i18n.localize(`ACKS-HENCHMEN.wages.${cost.wages}`),
+      }),
+      value: tier,
+    });
+  }
+  return { bribery, options, tiers };
+}
+
+/** Shared launcher for candidates and special hires. */
+async function launchOffer({ location, employer, offer }) {
+  const signing = signingSetup(employer, offer.wage);
+  const slanderCount = location.system.slanderCountFor?.(employer.uuid) ?? 0;
+
+  if (hostsModes()) {
+    openHiringViaInfluence({
+      employer,
+      targetActor: offer.targetActor ?? null,
+      targetName: offer.name,
+      targetImg: offer.img ?? "",
+      signingBonusOptions: signing.options,
+      previousRefusals: offer.refusals,
+      slanderCount,
+      context: {
+        locationUuid: location.uuid,
+        candidateId: offer.candidateId ?? null,
+        specialHireId: offer.specialHireId ?? null,
+        employerUuid: employer.uuid,
+        signingTiers: signing.tiers,
+      },
+    });
+    return;
+  }
+
+  // Fallback: the module's own throw dialog.
+  const optionLabels = { signingBonus: {} };
+  for (const [tier, gp] of Object.entries(signing.tiers)) {
+    optionLabels.signingBonus[`tier${tier}`] = game.i18n.format("ACKS-HENCHMEN.mod.signingBonusTierLabel", {
+      gp,
+      wages: game.i18n.localize(
+        `ACKS-HENCHMEN.wages.${signingBonusCost(Number(tier), offer.wage, signing.bribery)?.wages ?? "week"}`
+      ),
+    });
+  }
+  openThrowDialog("reactionToHiring", {
+    title: `${offer.name} — ${employer.name}`,
+    actor: employer,
+    derived: {
+      chaMod: adapter.getChaMod(employer),
+      previousRefusals: offer.refusals,
+      slanderCount,
+    },
+    dynamicModifiers: toDialogModifiers(collectEffectModifiers(employer, "hiring")),
+    optionLabels,
+    infoText: game.i18n.format("ACKS-HENCHMEN.recruit.info", {
+      name: offer.name,
+      wage: offer.wage,
+      bribery: signing.bribery
+        ? game.i18n.localize("ACKS-HENCHMEN.recruit.briberyYes")
+        : game.i18n.localize("ACKS-HENCHMEN.recruit.briberyNo"),
+    }),
+    onResolve: async (result) => {
+      const signingTier = result.parts.find((p) => p.id === "signingBonus")?.value ?? 0;
+      const signingGp = signingTier > 0 ? (signing.tiers[signingTier] ?? 0) : 0;
+      await executeAsGM("hiringOutcome", {
+        locationUuid: location.uuid,
+        candidateId: offer.candidateId ?? null,
+        specialHireId: offer.specialHireId ?? null,
+        employerUuid: employer.uuid,
+        result: { outcome: result.outcome, natural: result.natural, total: result.total, parts: result.parts },
+        signingGp,
+      });
+    },
+  });
+}
+
+/** Recruit a rolled market candidate. */
 export async function openRecruitDialog(location, candidateId, preferredEmployer = null) {
   const candidate = (location.system.candidates ?? []).find((c) => c.id === candidateId);
   if (!candidate) return;
@@ -68,58 +147,53 @@ export async function openRecruitDialog(location, candidateId, preferredEmployer
     ui.notifications.warn(game.i18n.localize("ACKS-HENCHMEN.recruit.noEmployer"));
     return;
   }
-
-  // Signing bonus prices scale with the candidate's wage and Bribery.
-  const wage = Number(candidate.wageGp) || 12;
-  const bribery = hasBribery(employer);
-  const optionLabels = { signingBonus: {} };
-  for (const tier of [1, 2, 3]) {
-    const cost = signingBonusCost(tier, wage, bribery);
-    if (cost) {
-      optionLabels.signingBonus[`tier${tier}`] = game.i18n.format("ACKS-HENCHMEN.mod.signingBonusTierLabel", {
-        gp: cost.gp,
-        wages: game.i18n.localize(`ACKS-HENCHMEN.wages.${cost.wages}`),
-      });
-    }
-  }
-
-  const dynamicModifiers = toDialogModifiers(collectEffectModifiers(employer, "hiring"));
-  const refusals = (candidate.refusals ?? []).length;
-  const slanderCount = location.system.slanderCountFor?.(employer.uuid) ?? 0;
-
-  openThrowDialog("reactionToHiring", {
-    title: `${candidate.name} — ${employer.name}`,
-    actor: employer,
-    derived: {
-      chaMod: adapter.getChaMod(employer),
-      previousRefusals: refusals,
-      slanderCount,
-    },
-    dynamicModifiers,
-    optionLabels,
-    infoText: game.i18n.format("ACKS-HENCHMEN.recruit.info", {
+  await launchOffer({
+    location,
+    employer,
+    offer: {
+      candidateId,
       name: candidate.name,
-      wage,
-      bribery: bribery
-        ? game.i18n.localize("ACKS-HENCHMEN.recruit.briberyYes")
-        : game.i18n.localize("ACKS-HENCHMEN.recruit.briberyNo"),
-    }),
-    onResolve: async (result) => {
-      const signingTier = result.parts.find((p) => p.id === "signingBonus")?.value ?? 0;
-      const signingGp = signingTier > 0 ? (signingBonusCost(signingTier, wage, bribery)?.gp ?? 0) : 0;
-      // Mutations (actor creation, location writes) run on the GM client.
-      await executeAsGM("hiringOutcome", {
-        locationUuid: location.uuid,
-        candidateId,
-        employerUuid: employer.uuid,
-        result: { outcome: result.outcome, natural: result.natural, total: result.total, parts: result.parts },
-        signingGp,
-      });
+      wage: Number(candidate.wageGp) || 12,
+      refusals: (candidate.refusals ?? []).length,
     },
   });
 }
 
-/** GM-side executor for a resolved hiring throw (socket action). */
+/** Recruit a special hire (a real actor: GM-placed or found on adventure). */
+export async function openRecruitSpecial(location, specialHireId, preferredEmployer = null) {
+  const entry = (location.system.specialHires ?? []).find((s) => s.id === specialHireId);
+  if (!entry) return;
+  if (entry.status !== "available") {
+    ui.notifications.warn(game.i18n.localize("ACKS-HENCHMEN.recruit.notAvailable"));
+    return;
+  }
+  if ((entry.refusals ?? []).some((r) => r.result === "refuseSlander")) {
+    ui.notifications.warn(game.i18n.localize("ACKS-HENCHMEN.recruit.slanderedBlock"));
+    return;
+  }
+  const employer = await pickEmployer(preferredEmployer);
+  if (!employer) {
+    ui.notifications.warn(game.i18n.localize("ACKS-HENCHMEN.recruit.noEmployer"));
+    return;
+  }
+  const doc = await fromUuid(entry.actorUuid).catch(() => null);
+  const target = doc?.actor ?? doc;
+  const wage = Number(target?.system?.retainer?.wage) || henchmanWage(adapter.getWageLevel(target ?? {}));
+  await launchOffer({
+    location,
+    employer,
+    offer: {
+      specialHireId,
+      name: entry.name,
+      img: entry.img,
+      targetActor: target ?? null,
+      wage,
+      refusals: (entry.refusals ?? []).length,
+    },
+  });
+}
+
+/** GM-side executor for a resolved hiring throw (socket action + hook). */
 export async function handleHiringOutcomePayload(payload) {
   const location = await fromUuid(payload.locationUuid);
   const employer = await fromUuid(payload.employerUuid);
@@ -127,7 +201,8 @@ export async function handleHiringOutcomePayload(payload) {
   await handleOutcome({
     location,
     candidateId: payload.candidateId,
-    employer,
+    specialHireId: payload.specialHireId,
+    employer: employer.actor ?? employer,
     result: payload.result,
     signingGp: payload.signingGp,
   });
@@ -135,28 +210,32 @@ export async function handleHiringOutcomePayload(payload) {
 
 registerSocketAction("hiringOutcome", handleHiringOutcomePayload);
 
-async function handleOutcome({ location, candidateId, employer, result, signingGp }) {
+async function handleOutcome({ location, candidateId, specialHireId, employer, result, signingGp }) {
   const outcome = result.outcome;
-  Hooks.callAll(HOOKS.HIRING_OUTCOME, { location, candidateId, employer, result });
+  Hooks.callAll(HOOKS.HIRING_OUTCOME, { location, candidateId, specialHireId, employer, result });
 
   const pushRefusal = async (kind) => {
-    const candidate = (location.system.candidates ?? []).find((c) => c.id === candidateId);
-    const refusals = [...(candidate?.refusals ?? []).map((r) => r.toObject?.() ?? r), {
-      employerUuid: employer.uuid,
-      time: now(),
-      result: kind,
-    }];
-    await updateCandidate(location, candidateId, { refusals });
+    const refusal = { employerUuid: employer.uuid, time: now(), result: kind };
+    if (specialHireId) {
+      const entry = (location.system.specialHires ?? []).find((s) => s.id === specialHireId);
+      await updateSpecialHire(location, specialHireId, {
+        refusals: [...(entry?.refusals ?? []).map((r) => r.toObject?.() ?? r), refusal],
+      });
+    } else if (candidateId) {
+      const candidate = (location.system.candidates ?? []).find((c) => c.id === candidateId);
+      await updateCandidate(location, candidateId, {
+        refusals: [...(candidate?.refusals ?? []).map((r) => r.toObject?.() ?? r), refusal],
+      });
+    }
   };
 
   switch (outcome) {
     case "acceptElan":
     case "accept": {
-      const hired = await hire(location, candidateId, employer, {
-        elan: outcome === "acceptElan",
-        signingBonusGp: signingGp,
-        origin: "market",
-      });
+      const opts = { elan: outcome === "acceptElan", signingBonusGp: signingGp, origin: "market" };
+      const hired = specialHireId
+        ? await hireExistingActor(location, specialHireId, employer, opts)
+        : await hire(location, candidateId, employer, opts);
       if (hired.error) {
         ui.notifications.error(game.i18n.localize(`ACKS-HENCHMEN.hire.error.${hired.error}`));
       }
@@ -176,13 +255,19 @@ async function handleOutcome({ location, candidateId, employer, result, signingG
     }
     case "refuseSlander": {
       await pushRefusal("refuseSlander");
-      const candidate = (location.system.candidates ?? []).find((c) => c.id === candidateId);
-      await updateCandidate(location, candidateId, { status: "slandered" });
+      let npcName = "";
+      if (candidateId) {
+        const candidate = (location.system.candidates ?? []).find((c) => c.id === candidateId);
+        npcName = candidate?.name ?? "";
+        await updateCandidate(location, candidateId, { status: "slandered" });
+      } else if (specialHireId) {
+        npcName = (location.system.specialHires ?? []).find((s) => s.id === specialHireId)?.name ?? "";
+      }
       const slander = [
         ...(location.system.slander ?? []).map((s) => s.toObject?.() ?? s),
         {
           partyKey: employer.uuid,
-          npcName: candidate?.name ?? "",
+          npcName,
           time: now(),
           note: game.i18n.localize("ACKS-HENCHMEN.recruit.slanderNote"),
         },

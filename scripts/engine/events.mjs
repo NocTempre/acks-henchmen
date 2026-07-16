@@ -69,44 +69,73 @@ export async function addLoyaltyPermanent(actor, delta, reason, note = "") {
 /* ------------------------- loyalty / obedience rolls ------------------------- */
 
 /**
- * Open the secret Hireling Loyalty throw for a hireling. Outcome bookkeeping
- * (grudging −1 / fanatic +1, departures) applies automatically; a sanitized
- * public reveal is offered on the GM card.
+ * Apply a resolved Hireling Loyalty outcome: event log, permanent ±1
+ * bookkeeping (Grudging/Fanatic), a departure card when the hireling
+ * leaves service, and the LOYALTY_ROLLED hook. Shared by the module's
+ * ThrowDialog and the influence-hosted loyalty page.
+ */
+export async function applyLoyaltyOutcome(actor, { outcome, total = null, note = "" } = {}) {
+  const employer = adapter.getManager(actor);
+  await HenchmanRecord.logEvent(actor, {
+    type: "loyaltyRoll",
+    note,
+    rollTotal: total,
+    outcome,
+  });
+  const delta = loyaltyDeltaForOutcome(outcome);
+  if (delta !== 0) {
+    await addLoyaltyPermanent(actor, delta, outcome === "fanatic" ? "fanatic" : "grudging");
+  }
+  if (outcomeLeavesService(outcome)) {
+    await postEventCard({
+      titleKey: "ACKS-HENCHMEN.card.leavesService",
+      bodyKey: `ACKS-HENCHMEN.outcomeHint.${outcome}`,
+      data: { name: actor.name },
+      buttons: [
+        { action: "dismissHireling", label: "ACKS-HENCHMEN.card.dismiss", icon: "fas fa-door-open", payload: { actorUuid: actor.uuid, outcome } },
+      ],
+      actor,
+    });
+  }
+  Hooks.callAll(HOOKS.LOYALTY_ROLLED, { actor, employer, result: { outcome, total } });
+}
+
+/**
+ * Open the secret Hireling Loyalty roll for a hireling — as an influence-
+ * hosted page when acks-influence v1.3+ is active (consistent UI, tones
+ * hidden), else the module's own ThrowDialog. Outcome bookkeeping applies
+ * automatically either way.
  * @param {Actor} actor - the hireling
  * @param {object} [opts] - { reason, title }
  */
 export function openLoyaltyRoll(actor, opts = {}) {
   const employer = adapter.getManager(actor);
+
+  // Influence-hosted page (loyalty is secret: open GM-side; the completion
+  // hook routes back through applyLoyaltyOutcome via the integration).
+  try {
+    // Late import avoids a load-order cycle (integration imports this file).
+    const integration = globalThis.acksHenchmen?.integrations?.influence;
+    if (integration?.hostsModes?.()) {
+      integration.openLoyaltyViaInfluence({
+        employer,
+        hireling: actor,
+        effectiveLoyalty: effectiveLoyaltyFor(actor),
+        context: { actorUuid: actor.uuid, reason: opts.reason ?? "" },
+      });
+      return;
+    }
+  } catch (err) {
+    console.warn("acks-henchmen | influence-hosted loyalty open failed; falling back", err);
+  }
+
   const dynamicModifiers = employer ? toDialogModifiers(collectEffectModifiers(employer, "loyaltyRoll")) : [];
   openThrowDialog("hirelingLoyalty", {
     title: opts.title ?? `${actor.name}${opts.reason ? ` (${opts.reason})` : ""}`,
     actor,
     derived: { effectiveLoyalty: effectiveLoyaltyFor(actor) },
     dynamicModifiers,
-    onResolve: async (result) => {
-      await HenchmanRecord.logEvent(actor, {
-        type: "loyaltyRoll",
-        note: opts.reason ?? "",
-        rollTotal: result.total,
-        outcome: result.outcome,
-      });
-      const delta = loyaltyDeltaForOutcome(result.outcome);
-      if (delta !== 0) {
-        await addLoyaltyPermanent(actor, delta, result.outcome === "fanatic" ? "fanatic" : "grudging");
-      }
-      if (outcomeLeavesService(result.outcome)) {
-        await postEventCard({
-          titleKey: "ACKS-HENCHMEN.card.leavesService",
-          bodyKey: `ACKS-HENCHMEN.outcomeHint.${result.outcome}`,
-          data: { name: actor.name },
-          buttons: [
-            { action: "dismissHireling", label: "ACKS-HENCHMEN.card.dismiss", icon: "fas fa-door-open", payload: { actorUuid: actor.uuid, outcome: result.outcome } },
-          ],
-          actor,
-        });
-      }
-      Hooks.callAll(HOOKS.LOYALTY_ROLLED, { actor, employer, result });
-    },
+    onResolve: (result) => applyLoyaltyOutcome(actor, { outcome: result.outcome, total: result.total, note: opts.reason ?? "" }),
   });
 }
 

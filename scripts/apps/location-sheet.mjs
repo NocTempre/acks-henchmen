@@ -8,11 +8,12 @@
  * fee ledger. Players with OBSERVER permission see the candidates their
  * paid searches cover; GMs see everything.
  */
-import { MODULE_ID, SECONDS_PER_WEEK } from "../constants.mjs";
+import { MODULE_ID, SECONDS_PER_DAY, SECONDS_PER_WEEK } from "../constants.mjs";
 import { getTable } from "../rules/tables.mjs";
 import { processLocation } from "../engine/recruitment.mjs";
+import { addSpecialHire, updateSpecialHire } from "../engine/hire.mjs";
 import { openPostingDialog } from "./posting-dialog.mjs";
-import { openRecruitDialog } from "./recruit-dialog.mjs";
+import { openRecruitDialog, openRecruitSpecial } from "./recruit-dialog.mjs";
 import { now, advanceDays } from "../time.mjs";
 
 const { HandlebarsApplicationMixin } = foundry.applications.api;
@@ -31,6 +32,9 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
       closePosting: LocationSheet.#onClosePosting,
       togglePlayerDetails: LocationSheet.#onTogglePlayerDetails,
       recruit: LocationSheet.#onRecruit,
+      recruitSpecial: LocationSheet.#onRecruitSpecial,
+      removeSpecial: LocationSheet.#onRemoveSpecial,
+      setSpecialLimit: LocationSheet.#onSetSpecialLimit,
       removeCandidate: LocationSheet.#onRemoveCandidate,
       addSlander: LocationSheet.#onAddSlander,
       removeSlander: LocationSheet.#onRemoveSlander,
@@ -190,6 +194,25 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     context.specialistRows = rows.filter((c) => c.kind === "specialist");
     context.candidateCount = rows.length;
 
+    // Special hires: real actors placed by the GM (no time limit unless
+    // set) or found on adventures (until hired that month, RAW default).
+    context.specialHires = (sys.specialHires ?? [])
+      .map((s) => s.toObject?.() ?? s)
+      .filter((s) => game.user.isGM || s.status === "available")
+      .map((s) => ({
+        ...s,
+        originLabel: game.i18n.localize(`ACKS-HENCHMEN.special.origin.${s.origin}`),
+        statusLabel: game.i18n.localize(`ACKS-HENCHMEN.special.status.${s.status}`),
+        isAvailable: s.status === "available",
+        refusalCount: (s.refusals ?? []).length,
+        limitLabel:
+          s.expiresTime > 0
+            ? game.i18n.format("ACKS-HENCHMEN.special.daysLeft", {
+                days: Math.max(0, Math.ceil((s.expiresTime - t) / SECONDS_PER_DAY)),
+              })
+            : game.i18n.localize("ACKS-HENCHMEN.special.noLimit"),
+      }));
+
     context.slander = (sys.slander ?? []).map((s, index) => ({ ...(s.toObject?.() ?? s), index }));
     context.ledger = (sys.searchLedger ?? []).slice(-20).reverse();
     context.ledgerTotal = (sys.searchLedger ?? []).reduce((s, l) => s + l.gp, 0);
@@ -302,6 +325,54 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
   static async #onRecruit(_event, target) {
     const candidate = this.#candidate(target);
     if (candidate) openRecruitDialog(this.actor, candidate.id);
+  }
+
+  /** GM drag-drop: register a dropped actor as a special hire. */
+  async _onDropActor(_event, actor) {
+    if (!game.user.isGM || !actor) return;
+    if (actor.type === `${MODULE_ID}.location`) return;
+    const existing = (this.actor.system.specialHires ?? []).find(
+      (s) => s.actorUuid === actor.uuid && s.status === "available"
+    );
+    if (existing) {
+      ui.notifications.info(game.i18n.format("ACKS-HENCHMEN.special.already", { name: actor.name }));
+      return;
+    }
+    await addSpecialHire(this.actor, actor, { origin: "gm" });
+    ui.notifications.info(game.i18n.format("ACKS-HENCHMEN.special.added", { name: actor.name }));
+  }
+
+  #specialHire(target) {
+    const id = target.closest("[data-special-id]")?.dataset.specialId;
+    return (this.actor.system.specialHires ?? []).find((s) => s.id === id);
+  }
+
+  static async #onRecruitSpecial(_event, target) {
+    const entry = this.#specialHire(target);
+    if (entry) openRecruitSpecial(this.actor, entry.id);
+  }
+
+  static async #onRemoveSpecial(_event, target) {
+    const entry = this.#specialHire(target);
+    if (!entry) return;
+    const entries = (this.actor.system.specialHires ?? [])
+      .map((s) => s.toObject?.() ?? s)
+      .filter((s) => s.id !== entry.id);
+    await this.actor.update({ "system.specialHires": entries });
+  }
+
+  /** GM: set/clear a decision time limit (in days from now; 0 = none). */
+  static async #onSetSpecialLimit(_event, target) {
+    const entry = this.#specialHire(target);
+    if (!entry) return;
+    const days = await foundry.applications.api.DialogV2.prompt({
+      window: { title: game.i18n.format("ACKS-HENCHMEN.special.limitTitle", { name: entry.name }) },
+      content: `<input type="number" name="days" min="0" step="1" placeholder="${game.i18n.localize("ACKS-HENCHMEN.special.limitPlaceholder")}" />`,
+      ok: { callback: (_e, button) => button.form.elements.days.value },
+    }).catch(() => null);
+    if (days === null) return;
+    const n = Math.max(0, Number(days) || 0);
+    await updateSpecialHire(this.actor, entry.id, { expiresTime: n > 0 ? now() + n * SECONDS_PER_DAY : 0 });
   }
 
   static async #onRemoveCandidate(_event, target) {
