@@ -16,8 +16,10 @@ build/release plumbing.
   from acks-module-template — never hand-edit**; change the template, then run
   `/acks-sync-toolchain`. `pack-data.mjs` (and data files it re-exports) are
   module-owned.
-- `docs/RULES.md` — canonical ACKS II rules extract; cite it instead of
-  re-deriving rules. `docs/MODEL.md` — design decisions.
+- Canonical ACKS II rules extract: `C:\Proj\acks-rules\acks-henchmen\RULES.md`
+  — **LOCAL-ONLY, never committed or shipped** (licensed book text; purged
+  from repo history 2026-07-16). Cite it instead of re-deriving rules.
+  `docs/MODEL.md` — design decisions (original content, stays in-repo).
 - `ruledata/` (if present) — runtime-fetched JSON rule content; ships in the zip.
 
 ## Commands

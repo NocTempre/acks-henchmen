@@ -93,7 +93,7 @@ scripts/          raw ESM (no bundler): entry, adapter, effects, rules/, engine/
 ruledata/         book-cited JSON tables (availability, rarity, wages, throws, followers…)
 templates/        Handlebars (dialogs, sheet, chat cards)
 packs/_source/    compendium JSON sources (compiled LevelDB in packs/)
-docs/RULES.md     canonical rules extract with citations
+acks-rules/acks-henchmen/RULES.md     canonical rules extract with citations
 docs/MODEL.md     data model + Active Effect contract + extension points
 ```
 
