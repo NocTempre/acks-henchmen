@@ -288,7 +288,10 @@
   "ACKS-HENCHMEN.location.processed": "Processed: {arrived} candidate(s) arrived.",
 
   "ACKS-HENCHMEN.special.header": "Special hires",
-  "ACKS-HENCHMEN.special.hint": "Real actors for hire: drag an actor onto this sheet to list a notable NPC (no time limit unless set), and recruits FOUND on adventures land here until hired that month (RR 162 sets no fixed window — the Judge decides). Hiring attempts are tracked per NPC.",
+  "ACKS-HENCHMEN.special.hint": "The results of DIRECTED searches (specific class / proficiency, JJ 118) sit here until hired or the month re-rolls, alongside notable NPCs: drag an actor onto this sheet to list one (no time limit unless set via the hourglass). Hiring attempts are tracked per NPC everywhere.",
+  "ACKS-HENCHMEN.special.directed": "Directed-search results (this month)",
+  "ACKS-HENCHMEN.special.actors": "Notable NPCs",
+  "ACKS-HENCHMEN.special.refusalsHint": "Failed hiring attempts by this party against this NPC — each adds a cumulative −1 to further offers (RR 162).",
   "ACKS-HENCHMEN.special.origin.header": "Origin",
   "ACKS-HENCHMEN.special.origin.gm": "Placed by the Judge",
   "ACKS-HENCHMEN.special.origin.found": "Found on adventure",

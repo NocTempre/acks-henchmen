@@ -167,9 +167,48 @@
   </details>
 
   <details class="section" open>
-    <summary>{{localize "ACKS-HENCHMEN.special.header"}} ({{specialHires.length}})</summary>
+    <summary>{{localize "ACKS-HENCHMEN.special.header"}} ({{specialHires.length}}{{#if directedRows.length}} + {{directedRows.length}}{{/if}})</summary>
     <p class="hint">{{localize "ACKS-HENCHMEN.special.hint"}}</p>
+    {{#if directedRows.length}}
+    <h4 class="bucket-header">{{localize "ACKS-HENCHMEN.special.directed"}} ({{directedRows.length}})</h4>
+    <table class="candidates-table">
+      <thead>
+        <tr>
+          <th>{{localize "ACKS-HENCHMEN.candidate.name"}}</th>
+          <th>{{localize "ACKS-HENCHMEN.candidate.age"}}</th>
+          <th>{{localize "ACKS-HENCHMEN.candidate.culture"}}</th>
+          <th>{{localize "ACKS-HENCHMEN.candidate.identity"}}</th>
+          <th>{{localize "ACKS-HENCHMEN.candidate.wage"}}</th>
+          <th>{{localize "ACKS-HENCHMEN.special.refusals"}}</th>
+          <th>{{localize "ACKS-HENCHMEN.candidate.statusHeader"}}</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#each directedRows}}
+        <tr data-candidate-id="{{id}}" class="status-{{status}}">
+          <td data-tooltip="{{appearanceTip}}">{{name}} <i class="fas fa-user-lock" data-tooltip="{{localize 'ACKS-HENCHMEN.posting.privateHint'}}"></i></td>
+          <td>{{age}}</td>
+          <td>{{cultureLabel}}</td>
+          <td>{{identityLine}}</td>
+          <td>{{#if wageGp}}{{wageGp}} gp/{{wageUnit}}{{/if}}</td>
+          <td>{{refusalCount}}</td>
+          <td>{{statusLabel}}</td>
+          <td class="row-actions">
+            {{#if isAvailable}}
+            <a data-action="recruit" data-tooltip="{{localize 'ACKS-HENCHMEN.candidate.recruit'}}"><i class="fas fa-handshake"></i></a>
+            {{/if}}
+            {{#if @root.isGM}}
+            <a data-action="removeCandidate" data-tooltip="{{localize 'ACKS-HENCHMEN.candidate.remove'}}"><i class="fas fa-trash"></i></a>
+            {{/if}}
+          </td>
+        </tr>
+        {{/each}}
+      </tbody>
+    </table>
+    {{/if}}
     {{#if specialHires.length}}
+    <h4 class="bucket-header">{{localize "ACKS-HENCHMEN.special.actors"}} ({{specialHires.length}})</h4>
     <table class="candidates-table">
       <thead>
         <tr>
@@ -202,9 +241,10 @@
         {{/each}}
       </tbody>
     </table>
-    {{else}}
-    <p class="hint">{{localize "ACKS-HENCHMEN.special.empty"}}</p>
     {{/if}}
+    {{#unless specialHires.length}}{{#unless directedRows.length}}
+    <p class="hint">{{localize "ACKS-HENCHMEN.special.empty"}}</p>
+    {{/unless}}{{/unless}}
   </details>
 
   <details class="section" open>
@@ -225,6 +265,7 @@
           <th data-sortable>{{localize "ACKS-HENCHMEN.candidate.culture"}}</th>
           <th data-sortable>{{localize "ACKS-HENCHMEN.candidate.identity"}}</th>
           <th data-sortable>{{localize "ACKS-HENCHMEN.candidate.wage"}}</th>
+          <th data-sortable data-tooltip="{{localize 'ACKS-HENCHMEN.special.refusalsHint'}}">{{localize "ACKS-HENCHMEN.special.refusals"}}</th>
           <th data-sortable>{{localize "ACKS-HENCHMEN.candidate.statusHeader"}}</th>
           <th></th>
         </tr>
@@ -232,11 +273,12 @@
       <tbody>
         {{#each henchmenRows}}
         <tr data-candidate-id="{{id}}" class="status-{{status}}">
-          <td data-tooltip="{{appearanceTip}}">{{name}}{{#if isPrivate}} <i class="fas fa-user-lock" data-tooltip="{{localize 'ACKS-HENCHMEN.posting.privateHint'}}"></i>{{/if}}</td>
+          <td data-tooltip="{{appearanceTip}}">{{name}}</td>
           <td>{{age}}</td>
           <td>{{cultureLabel}}</td>
           <td>{{identityLine}}</td>
           <td>{{#if wageGp}}{{wageGp}} gp/{{wageUnit}}{{/if}}</td>
+          <td>{{refusalCount}}</td>
           <td>{{statusLabel}}</td>
           <td class="row-actions">
             {{#if isAvailable}}
@@ -295,6 +337,7 @@
           <th data-sortable>{{localize "ACKS-HENCHMEN.candidate.culture"}}</th>
           <th data-sortable>{{localize "ACKS-HENCHMEN.candidate.specialty"}}</th>
           <th data-sortable>{{localize "ACKS-HENCHMEN.candidate.wage"}}</th>
+          <th data-sortable data-tooltip="{{localize 'ACKS-HENCHMEN.special.refusalsHint'}}">{{localize "ACKS-HENCHMEN.special.refusals"}}</th>
           <th data-sortable>{{localize "ACKS-HENCHMEN.candidate.statusHeader"}}</th>
           <th></th>
         </tr>
@@ -307,6 +350,7 @@
           <td>{{cultureLabel}}</td>
           <td>{{identityLine}}</td>
           <td>{{#if wageGp}}{{wageGp}} gp/{{wageUnit}}{{/if}}</td>
+          <td>{{refusalCount}}</td>
           <td>{{statusLabel}}</td>
           <td class="row-actions">
             {{#if isAvailable}}

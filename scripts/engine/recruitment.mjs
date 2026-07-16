@@ -463,11 +463,14 @@ export async function processLocation(location, currentTime = now()) {
     }
   }
 
-  // 1b. Weekly churn: a candidate stays on the market for ONE WEEK after
-  // arriving — unhired, they take other work and DISAPPEAR from the list.
+  // 1b. Weekly churn: a SHARED-pool candidate stays on the market for ONE
+  // WEEK after arriving — unhired, they take other work and DISAPPEAR.
+  // DIRECTED-search results (privateToUuid) are exempt: the specific
+  // henchman found for a recruiter stays available until hired or the
+  // month re-rolls (JJ 118's monthly cadence).
   const before = candidates.length;
   candidates = candidates.filter(
-    (c) => !(c.status === "available" && currentTime - c.availableFromTime >= SECONDS_PER_WEEK)
+    (c) => !(c.status === "available" && !c.privateToUuid && currentTime - c.availableFromTime >= SECONDS_PER_WEEK)
   );
   if (candidates.length !== before) changed = true;
 

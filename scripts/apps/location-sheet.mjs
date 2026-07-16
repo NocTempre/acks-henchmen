@@ -184,15 +184,19 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
           appearanceTip: masked ? "" : c.appearance,
           isAggregate: (c.quantity ?? 1) > 1,
           isPrivate: !!c.privateToUuid,
+          refusalCount: (c.refusals ?? []).length,
           statusLabel: game.i18n.localize(`ACKS-HENCHMEN.candidate.status.${c.status}`),
           isAvailable: c.status === "available",
         };
       })
       .sort((a, b) => (a.status === b.status ? 0 : a.status === "available" ? -1 : 1));
-    context.henchmenRows = rows.filter((c) => henchKinds.includes(c.kind));
-    context.mercenaryRows = rows.filter((c) => c.kind === "mercenary");
-    context.specialistRows = rows.filter((c) => c.kind === "specialist");
-    context.candidateCount = rows.length;
+    // Directed-search results (private candidates) live in the SPECIAL
+    // bucket: they stay until hired or the month re-rolls.
+    context.directedRows = rows.filter((c) => c.isPrivate);
+    context.henchmenRows = rows.filter((c) => henchKinds.includes(c.kind) && !c.isPrivate);
+    context.mercenaryRows = rows.filter((c) => c.kind === "mercenary" && !c.isPrivate);
+    context.specialistRows = rows.filter((c) => c.kind === "specialist" && !c.isPrivate);
+    context.candidateCount = rows.length - context.directedRows.length;
 
     // Special hires: real actors placed by the GM (no time limit unless
     // set) or found on adventures (until hired that month, RAW default).
