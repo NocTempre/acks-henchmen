@@ -1,7 +1,8 @@
 # acks-henchmen — Data Model & Integration Contract
 
 How the module stores data, how proficiencies/powers plug in, and how other
-modules extend it. Companion to [RULES.md](RULES.md).
+modules extend it. Companion to the local rules extract
+(`acks-rules/acks-henchmen/RULES.md`, kept outside the repo).
 
 ## 1. Design rules
 
