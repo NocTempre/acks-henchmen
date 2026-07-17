@@ -339,6 +339,10 @@
   "ACKS-HENCHMEN.setting.wagesToBank": "Pay wages into the bank",
   "ACKS-HENCHMEN.setting.wagesToBankHint": "Wages credit each hireling's banked coin (quantitybank); disable to hand over carried coin instead.",
   "ACKS-HENCHMEN.fee.reason": "weekly hireling search fees in {name}",
+  "ACKS-HENCHMEN.fee.card": "Weekly search fee — {name}, week {week} ({formula} gp)",
+  "ACKS-HENCHMEN.location.searchFee": "Search fee",
+  "ACKS-HENCHMEN.location.searchFeeHint": "Rolled weekly per hireling type searched (RR 162), at this town's market class — the same rate for every recruiter.",
+  "ACKS-HENCHMEN.location.perWeek": "week/type",
 
   "ACKS-HENCHMEN.time.advanceDisabled": "World-time advancement is disabled in the module settings.",
 

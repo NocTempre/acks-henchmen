@@ -80,6 +80,13 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     context.isGM = game.user.isGM;
     context.marketClass = sys.marketClass;
     context.marketClassRoman = ["I", "II", "III", "IV", "V", "VI"][sys.marketClass - 1];
+    context.searchFeeFormula = (() => {
+      try {
+        return getTable("availability", "searchFees").byMarketClass[String(sys.marketClass)];
+      } catch {
+        return "";
+      }
+    })();
     context.marketClassSource = sys.marketClassOverride
       ? game.i18n.localize("ACKS-HENCHMEN.location.sourceOverride")
       : sys.urbanFamilies != null

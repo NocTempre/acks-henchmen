@@ -1,4 +1,4 @@
-/* global game, foundry, Roll, Hooks */
+/* global game, foundry, Roll, Hooks, ChatMessage */
 /**
  * Recruitment engine — RAW model (RR 162, JJ 118):
  *
@@ -277,12 +277,33 @@ export async function rollMonth(location, anchorTime) {
 
 /* ------------------------- postings (paid searches) ------------------------- */
 
-async function chargeWeeklyFee(location, employer) {
-  const mc = effectiveMarketClass(location, employer);
-  const gp = await rollDice(searchFeeFormula(mc));
+/**
+ * Roll and charge one week's search fee (RR 162: fee per week per hireling
+ * type, rolled). The fee is the TOWN's posted rate — the location's own
+ * market class, NOT the employer's Mercantile-Network-shifted class (that
+ * shift governs availability, not the cost of advertising here). Rolled once
+ * as a VISIBLE dice roll; the same total is shown, deducted, and logged.
+ * @param {Actor} location
+ * @param {Actor|null} employer
+ * @param {number} week - the week number being charged (for the card)
+ */
+async function chargeWeeklyFee(location, employer, week = 1) {
+  const mc = location.system.marketClass;
+  const formula = searchFeeFormula(mc);
+  const roll = await new Roll(formula).evaluate();
+  const gp = roll.total;
+  // Show the fee as an actual roll so it never reads as a flat charge.
+  await ChatMessage.create({
+    flavor: game.i18n.format("ACKS-HENCHMEN.fee.card", { name: location.name, week, formula }),
+    rolls: [roll],
+    speaker: ChatMessage.getSpeaker({ actor: employer ?? location }),
+    whisper: adapter.gmIds(),
+  });
   let paid = false;
   if (employer) {
-    paid = await adapter.spendGold(employer, gp, game.i18n.format("ACKS-HENCHMEN.fee.reason", { name: location.name }));
+    paid = await adapter.spendGold(employer, gp, game.i18n.format("ACKS-HENCHMEN.fee.reason", { name: location.name }), {
+      chat: false, // the roll card above IS the receipt
+    });
   }
   return { gp, paid };
 }
@@ -387,7 +408,7 @@ export async function createPosting(location, rawSpec, employer, { dedicatedSear
     posting.rollDetail = entry?.detail ?? "";
   }
 
-  const fee = await chargeWeeklyFee(location, employer);
+  const fee = await chargeWeeklyFee(location, employer, 1);
   posting.feesPaid.push({ time: currentTime, gp: fee.gp });
 
   const update = {
@@ -497,7 +518,7 @@ export async function processLocation(location, currentTime = now()) {
     const weeksElapsed = Math.floor((currentTime - posting.createdTime) / SECONDS_PER_WEEK) + 1;
     const feesPaid = posting.feesPaid.length;
     for (let w = feesPaid; w < weeksElapsed; w++) {
-      const fee = await chargeWeeklyFee(location, employer);
+      const fee = await chargeWeeklyFee(location, employer, w + 1);
       posting.feesPaid.push({ time: currentTime, gp: fee.gp });
       ledger.push({ time: currentTime, gp: fee.gp, postingId: posting.id, paidByUuid: posting.employerUuid });
       changed = true;

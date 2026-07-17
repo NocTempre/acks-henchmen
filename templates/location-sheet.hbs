@@ -7,6 +7,11 @@
         <span class="market-class-badge" data-tooltip="{{marketClassSource}}">
           {{localize "ACKS-HENCHMEN.location.marketClass"}}: <strong>{{marketClassRoman}}</strong>
         </span>
+        {{#if searchFeeFormula}}
+        <span class="market-class-badge" data-tooltip="{{localize 'ACKS-HENCHMEN.location.searchFeeHint'}}">
+          {{localize "ACKS-HENCHMEN.location.searchFee"}}: <strong>{{searchFeeFormula}}</strong> gp/{{localize "ACKS-HENCHMEN.location.perWeek"}}
+        </span>
+        {{/if}}
         {{#if isGM}}
         <button type="button" data-action="processNow" data-tooltip="{{localize 'ACKS-HENCHMEN.location.processNowHint'}}">
           <i class="fas fa-rotate"></i> {{localize "ACKS-HENCHMEN.location.processNow"}}
