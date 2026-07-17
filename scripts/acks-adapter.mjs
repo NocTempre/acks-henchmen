@@ -165,20 +165,37 @@ export async function spendGold(actor, gp, reason, { chat = true } = {}) {
   return true;
 }
 
-/** Credit gp onto the gp denomination (coppervalue 100), else the largest. */
-export async function grantGold(actor, gp) {
+/**
+ * Credit gp onto the gp denomination (coppervalue 100), else the largest.
+ * Creates a standard gp money item when the actor carries none (freshly
+ * hired actors own no coins). `toBank` credits `quantitybank` instead of
+ * carried coin — wages land in the bank unless overridden.
+ */
+export async function grantGold(actor, gp, { toBank = false } = {}) {
   const copper = Math.round(gp * 100);
   if (copper <= 0) return 0;
   const coins = actor.items.filter((i) => i.type === "money");
-  const target =
+  let target =
     coins.find((c) => Number(c.system.coppervalue) === 100) ??
     coins.sort((a, b) => Number(b.system.coppervalue) - Number(a.system.coppervalue))[0];
   if (!target) {
-    ui?.notifications?.warn(game.i18n.format("ACKS-HENCHMEN.gold.noCoins", { name: actor.name }));
-    return 0;
+    const created = await actor.createEmbeddedDocuments("Item", [
+      {
+        name: game.i18n.localize("ACKS-HENCHMEN.gold.gpItemName"),
+        type: "money",
+        img: "icons/svg/coins.svg",
+        system: { coppervalue: 100, quantity: 0, quantitybank: 0 },
+      },
+    ]);
+    target = created?.[0];
+    if (!target) {
+      ui?.notifications?.warn(game.i18n.format("ACKS-HENCHMEN.gold.noCoins", { name: actor.name }));
+      return 0;
+    }
   }
   const add = Math.floor(copper / Number(target.system.coppervalue));
-  await target.update({ "system.quantity": Number(target.system.quantity ?? 0) + add });
+  const field = toBank ? "quantitybank" : "quantity";
+  await target.update({ [`system.${field}`]: Number(target.system[field] ?? 0) + add });
   return (add * Number(target.system.coppervalue)) / 100;
 }
 

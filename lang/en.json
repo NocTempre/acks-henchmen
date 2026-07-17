@@ -333,6 +333,11 @@
   "ACKS-HENCHMEN.gold.insufficient": "{name} cannot pay {gp} gp ({reason}).",
   "ACKS-HENCHMEN.gold.spent": "{name} pays {gp} gp — {reason}.",
   "ACKS-HENCHMEN.gold.noCoins": "{name} has no money items to credit.",
+  "ACKS-HENCHMEN.gold.gpItemName": "Gold Pieces",
+  "ACKS-HENCHMEN.wage.paidBank": "{gp} gp paid into the bank",
+  "ACKS-HENCHMEN.wage.paidHand": "{gp} gp paid in hand",
+  "ACKS-HENCHMEN.setting.wagesToBank": "Pay wages into the bank",
+  "ACKS-HENCHMEN.setting.wagesToBankHint": "Wages credit each hireling's banked coin (quantitybank); disable to hand over carried coin instead.",
   "ACKS-HENCHMEN.fee.reason": "weekly hireling search fees in {name}",
 
   "ACKS-HENCHMEN.time.advanceDisabled": "World-time advancement is disabled in the module settings.",

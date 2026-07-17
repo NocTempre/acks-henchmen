@@ -50,8 +50,10 @@ export function signingBonusCost(tier, monthlyWage, briberyProficient) {
   const rows = briberyProficient ? table.proficient : table.nonProficient;
   const row = rows.find((r) => r.bonus === tier);
   if (!row) return null;
-  const perDay = monthlyWage / 30;
-  const gp = { day: perDay, week: perDay * 7, month: monthlyWage, year: monthlyWage * 12 }[row.wages];
+  // Family-standard pay conversions (RAW names the periods, not the math):
+  // a week's pay = monthly / 4, a day's = monthly / 30 — matching the
+  // influence module's bribe tiers so both rollers price identically.
+  const gp = { day: monthlyWage / 30, week: monthlyWage / 4, month: monthlyWage, year: monthlyWage * 12 }[row.wages];
   return { gp: Math.ceil(gp), wages: row.wages };
 }
 

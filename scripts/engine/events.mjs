@@ -224,7 +224,12 @@ export async function recordCalamity(actor, note = "") {
 
 /* ------------------------- wages ------------------------- */
 
-/** Managed hirelings of one employer whose wage month has elapsed. */
+/**
+ * Managed hirelings of one employer whose wage month has elapsed. RAW: the
+ * FULL monthly wage (RR 168), × retainer quantity for troop-scale entries,
+ * × every whole month elapsed since the last payday — no weekly division
+ * anywhere in wage payment.
+ */
 function dueHirelings(employer, currentTime) {
   const due = [];
   const ids = [...adapter.getHenchmenIds(employer), ...(employer.getFlag(MODULE_ID, "monsterHenchmenList") ?? [])];
@@ -234,15 +239,22 @@ function dueHirelings(employer, currentTime) {
     const record = actor.getFlag(MODULE_ID, FLAG_RECORD) ?? {};
     if (record.terms?.vassalDomain) continue; // domain income covers the wage
     const last = record.terms?.lastPaidTime ?? record.hiredTime ?? 0;
-    if (currentTime - last >= secondsPerMonth()) {
-      const wage = Number(record.terms?.wageGp ?? adapter.getRetainer(actor).wage) || henchmanWage(adapter.getWageLevel(actor));
-      due.push({ actor, wage, record });
+    const months = Math.floor((currentTime - last) / secondsPerMonth());
+    if (months >= 1) {
+      const retainer = adapter.getRetainer(actor);
+      const monthly =
+        (Number(record.terms?.wageGp ?? retainer.wage) || henchmanWage(adapter.getWageLevel(actor))) *
+        Math.max(1, retainer.quantity);
+      due.push({ actor, record, months, monthly, amount: monthly * months, paidThrough: last + months * secondsPerMonth() });
     }
   }
   return due;
 }
 
-/** Pay all due wages for one employer (coin spend + ledger + hooks). */
+/**
+ * Pay all due wages for one employer: gold LEAVES the employer and LANDS on
+ * each hireling — into their bank unless the `wagesToBank` setting is off.
+ */
 export async function payWagesFor(employer, { markMissed = false } = {}) {
   const currentTime = now();
   const due = dueHirelings(employer, currentTime);
@@ -250,25 +262,31 @@ export async function payWagesFor(employer, { markMissed = false } = {}) {
     ui.notifications.info(game.i18n.format("ACKS-HENCHMEN.wage.nothingDue", { name: employer.name }));
     return;
   }
-  const total = due.reduce((s, d) => s + d.wage, 0);
+  const total = due.reduce((s, d) => s + d.amount, 0);
   if (!markMissed) {
     const paid = await adapter.spendGold(employer, total, game.i18n.format("ACKS-HENCHMEN.wage.reason", { count: due.length }));
     if (!paid) markMissed = true; // insufficient funds → wages missed
   }
-  for (const { actor, wage, record } of due) {
+  const toBank = getSetting("wagesToBank");
+  for (const { actor, record, amount, paidThrough } of due) {
     if (markMissed) {
       await actor.setFlag(MODULE_ID, FLAG_RECORD, {
         ...record,
-        terms: { ...(record.terms ?? {}), lastPaidTime: currentTime, arrearsGp: (record.terms?.arrearsGp ?? 0) + wage },
+        terms: { ...(record.terms ?? {}), lastPaidTime: paidThrough, arrearsGp: (record.terms?.arrearsGp ?? 0) + amount },
       });
-      await HenchmanRecord.logEvent(actor, { type: "wageMissed", note: `${wage} gp` });
+      await HenchmanRecord.logEvent(actor, { type: "wageMissed", note: `${amount} gp` });
       await recordCalamity(actor, game.i18n.localize("ACKS-HENCHMEN.wage.missedCalamity"));
     } else {
+      // The transfer: credit the hireling (bank by default).
+      await adapter.grantGold(actor, amount, { toBank });
       await actor.setFlag(MODULE_ID, FLAG_RECORD, {
         ...record,
-        terms: { ...(record.terms ?? {}), lastPaidTime: currentTime },
+        terms: { ...(record.terms ?? {}), lastPaidTime: paidThrough },
       });
-      await HenchmanRecord.logEvent(actor, { type: "wagePaid", note: `${wage} gp` });
+      await HenchmanRecord.logEvent(actor, {
+        type: "wagePaid",
+        note: game.i18n.format(toBank ? "ACKS-HENCHMEN.wage.paidBank" : "ACKS-HENCHMEN.wage.paidHand", { gp: amount }),
+      });
     }
   }
   Hooks.callAll(markMissed ? HOOKS.WAGES_MISSED : HOOKS.WAGES_PAID, { employer, total, count: due.length });
