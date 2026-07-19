@@ -8,6 +8,7 @@
  *  ready: system check, GM time watcher, chat commands, card listeners.
  */
 import { MODULE_ID, LOCATION_TYPE, RULEDATA, HOOKS, SCHEMA_VERSION } from "./constants.mjs";
+import { installWageGuard, registerDeletionCleanup, sweepAtReady, repairWorld, repairActor, scanActor, describeRepair } from "./repair.mjs";
 import * as config from "./config.mjs";
 import { registerSettings, getSetting } from "./settings.mjs";
 import { initTables, getTable, getDoc } from "./rules/tables.mjs";
@@ -50,6 +51,12 @@ Hooks.once("init", () => {
   });
 
   registerSettings();
+
+  // Core's getTotalWages dereferences every henchmenList id unguarded, so one
+  // deleted hireling breaks character-sheet render for everyone. Guard first,
+  // repair after (scripts/repair.mjs).
+  installWageGuard();
+  registerDeletionCleanup();
 
   try {
     const T = `modules/${MODULE_ID}/templates`;
@@ -131,6 +138,8 @@ Hooks.once("setup", async () => {
     // rules (pure; slavery rules only function with enableSlavery on)
     rules: { ...availabilityRules, ...wageRules, ...loyaltyRules, ...diceRules, ...candidateRules, ...identityRules, slavery: slaveryRules },
     tables: { getTable, getDoc },
+    // dangling-reference repair (core getTotalWages crash — see repair.mjs)
+    repair: { repairWorld, repairActor, scanActor, describeRepair },
     // adapter + effects (the data-driven modifier contract)
     adapter,
     effects: { collectEffectModifiers, sumEffectModifiers, hasEffectFlag },
@@ -150,6 +159,8 @@ Hooks.once("ready", () => {
   registerSockets();
   registerEventEngine();
   registerInfluenceIntegration();
+
+  if (getSetting("autoRepairReferences")) sweepAtReady();
 
   // Book tables are imported per-world, not shipped. Tell the GM once.
   if (missingRuledata.length && game.user.isGM) {

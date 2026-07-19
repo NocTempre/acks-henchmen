@@ -345,6 +345,28 @@ acksHenchmen.openThrowDialog("hirelingObedience", {
 });`
     ),
     macro(
+      "Repair Henchmen References",
+      "icons/svg/repair.svg",
+      `// Fixes the core acks 14.0.1 crash where a character sheet fails to render
+// ("Cannot read properties of undefined (reading 'system')" in getTotalWages):
+// a hireling was deleted while still listed on its employer.
+if (!game.user.isGM) return ui.notifications.warn("Only a GM can repair actor references.");
+const selected = canvas.tokens.controlled.map((t) => t.actor).filter(Boolean);
+const scope = selected.length ? selected : game.actors.contents;
+const preview = await acksHenchmen.repair.repairWorld({ dryRun: true, actors: scope });
+if (!preview.repaired.length) {
+  return ui.notifications.info(\`No dangling references found (\${preview.scanned} actor(s) scanned).\`);
+}
+const lines = preview.repaired.map((r) => "<li>" + acksHenchmen.repair.describeRepair(r) + "</li>").join("");
+const go = await foundry.applications.api.DialogV2.confirm({
+  window: { title: "Repair Henchmen References" },
+  content: \`<p>Found dangling references on <b>\${preview.repaired.length}</b> of \${preview.scanned} actor(s):</p><ul>\${lines}</ul><p>Remove them?</p>\`,
+});
+if (!go) return;
+const done = await acksHenchmen.repair.repairWorld({ actors: scope });
+ui.notifications.info(\`Repaired \${done.repaired.length} actor(s). Re-open any sheet that was failing.\`);`
+    ),
+    macro(
       "Generate Followers (Selected)",
       "icons/svg/castle.svg",
       `const actor = canvas.tokens.controlled[0]?.actor ?? game.user.character;

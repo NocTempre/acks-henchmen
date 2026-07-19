@@ -60,6 +60,14 @@ export function registerSettings() {
     type: Boolean,
     default: true,
   });
+  reg("autoRepairReferences", {
+    name: "ACKS-HENCHMEN.setting.autoRepairReferences",
+    hint: "ACKS-HENCHMEN.setting.autoRepairReferencesHint",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: true,
+  });
   reg("playerMarketVisibility", {
     name: "ACKS-HENCHMEN.setting.playerMarketVisibility",
     hint: "ACKS-HENCHMEN.setting.playerMarketVisibilityHint",
