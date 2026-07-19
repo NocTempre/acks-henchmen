@@ -9,7 +9,7 @@
  * paid searches cover; GMs see everything.
  */
 import { MODULE_ID, SECONDS_PER_DAY, SECONDS_PER_WEEK } from "../constants.mjs";
-import { getTable } from "../rules/tables.mjs";
+import { getTable, optTable } from "../rules/tables.mjs";
 import { processLocation, closePosting } from "../engine/recruitment.mjs";
 import { executeAsGM } from "../sockets.mjs";
 import { addSpecialHire, updateSpecialHire } from "../engine/hire.mjs";
@@ -92,12 +92,12 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
       : sys.urbanFamilies != null
         ? game.i18n.localize("ACKS-HENCHMEN.location.sourceFamilies")
         : game.i18n.localize("ACKS-HENCHMEN.location.sourceDefault");
-    context.rarityVariants = Object.entries(getTable("rarity", "classRarityTables").variants).map(([id, v]) => ({
+    context.rarityVariants = Object.entries(optTable("rarity", "classRarityTables")?.variants ?? {}).map(([id, v]) => ({
       id,
       label: game.i18n.localize(v.label),
       selected: id === sys.classRarityTableId,
     }));
-    context.cultureOptions = Object.entries(getTable("people", "cultures").list).map(([id, c]) => ({
+    context.cultureOptions = Object.entries(optTable("people", "cultures")?.list ?? {}).map(([id, c]) => ({
       id,
       label: c.label,
     }));
@@ -171,7 +171,7 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
       return coveredSegments.has(c.segment);
     };
 
-    const cultures = getTable("people", "cultures").list;
+    const cultures = optTable("people", "cultures")?.list ?? {};
     const henchKinds = ["henchman", "henchmanByClass", "henchmanByProficiency"];
     const rows = candidates
       .filter(playerVisible)

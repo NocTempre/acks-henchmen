@@ -6,7 +6,7 @@
  * employer level cap (RR 168) before rolling the month's pool.
  */
 import { MODULE_ID } from "../constants.mjs";
-import { getTable } from "../rules/tables.mjs";
+import { getTable, optTable } from "../rules/tables.mjs";
 import { createPosting } from "../engine/recruitment.mjs";
 import { maxHenchmanLevel } from "../rules/wages.mjs";
 import * as adapter from "../acks-adapter.mjs";
@@ -47,17 +47,17 @@ export class PostingDialog extends HandlebarsApplicationMixin(ApplicationV2) {
         .map((a) => ({ id: a.id, name: a.name, level: adapter.getLevel(a) }));
     }
     context.levels = [0, 1, 2, 3, 4].map((l) => ({ level: l }));
-    context.mercTypes = getTable("availability", "mercenaryAvailability").rows.map((r) => ({
+    context.mercTypes = (optTable("availability", "mercenaryAvailability")?.rows ?? []).map((r) => ({
       id: r.type,
       label: game.i18n.localize(`ACKS-HENCHMEN.troop.${r.type}`),
     }));
-    context.specialistTypes = getTable("availability", "specialistAvailability").rows.map((r) => ({
+    context.specialistTypes = (optTable("availability", "specialistAvailability")?.rows ?? []).map((r) => ({
       id: r.type,
       label: game.i18n.localize(`ACKS-HENCHMEN.specialist.${r.type}`),
     }));
     const variant = this.location.system.classRarityTableId || "default";
-    const variants = getTable("rarity", "classRarityTables").variants;
-    const tiers = (variants[variant] ?? variants.default).tiers;
+    const variants = optTable("rarity", "classRarityTables")?.variants ?? {};
+    const tiers = (variants[variant] ?? variants.default)?.tiers ?? {};
     context.classes = Object.entries(tiers).flatMap(([tier, list]) =>
       list.map((c) => ({ id: c, label: `${c} (${game.i18n.localize(`ACKS-HENCHMEN.rarity.${tier}`)})` }))
     );
