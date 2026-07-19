@@ -155,7 +155,7 @@ async function buildCandidates({ location, spec, total, marketClass, segment, pr
       const candidate = { ...base, id: foundry.utils.randomID(), quantity: 1 };
       if (spec.kind === "henchman") {
         if ((spec.level ?? 0) > 0) {
-          const rolled = await rollClassFromDistribution(rollDice, variant);
+          const rolled = await rollClassFromDistribution(rollDice, variant, spec.level);
           candidate.classKey = rolled.classKey;
           candidate.doubleD100 = rolled.rolls;
         } else {
@@ -176,7 +176,7 @@ async function buildCandidates({ location, spec, total, marketClass, segment, pr
         const lvl = await rollProficiencyLevel(rollDice, clampMarketClass(marketClass));
         candidate.level = lvl.level;
         if (lvl.level > 0) {
-          const cls = await rollClassFromDistribution(rollDice, variant);
+          const cls = await rollClassFromDistribution(rollDice, variant, lvl.level);
           candidate.classKey = cls.classKey;
           candidate.doubleD100 = cls.rolls;
         } else {

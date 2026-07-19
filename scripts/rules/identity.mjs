@@ -4,7 +4,7 @@
  * appearance, and (for 0th level) an occupation plus a class trajectory —
  * all generated from the LOCATION's demographics (weighted culture mix).
  */
-import { getTable } from "./tables.mjs";
+import { getTable, optTable } from "./tables.mjs";
 
 function pick(rand, list) {
   return list[Math.floor(rand() * list.length)];
@@ -23,8 +23,8 @@ function pickWeighted(rand, entries, weightOf) {
 
 /** Registry entry for a class ({bucket, rarity, race?, cultures?, sex?}). */
 export function classInfo(classKey) {
-  const registry = getTable("people", "classRegistry").classes;
-  return registry[String(classKey ?? "").toLowerCase().trim()] ?? null;
+  const registry = optTable("people", "classRegistry")?.classes;
+  return registry?.[String(classKey ?? "").toLowerCase().trim()] ?? null;
 }
 
 /** The race a class belongs to ("human" when the registry declares none). */
@@ -60,7 +60,7 @@ export function pickCulture(rand, demographics, race = null, cultureWhitelist = 
     if (cultureWhitelist && !cultureWhitelist.includes(id)) return false;
     if (!race) return true;
     if (race === "human") return raceOfCulture(id) === "human";
-    const raceCultures = getTable("people", "classRegistry").raceCultures?.[race];
+    const raceCultures = optTable("people", "classRegistry")?.raceCultures?.[race];
     if (raceCultures) return raceCultures.includes(id);
     return raceOfCulture(id) === race;
   };
@@ -93,7 +93,10 @@ export function generateName(rand, cultureId, gender) {
 /** One-line appearance from the culture's palette. */
 export function generateAppearance(rand, cultureId) {
   const culture = getTable("people", "cultures").list[cultureId];
-  if (!culture) return "";
+  // Appearance palettes are book PROSE, not imported as data — a culture may
+  // carry only its names. No palette → no generated line (the sheet can show
+  // a @PdfText reference to the culture description instead).
+  if (!culture?.hair?.length || !culture?.eyes?.length || !culture?.skin?.length) return "";
   const hair = pick(rand, culture.hair);
   const eyes = pick(rand, culture.eyes);
   const skin = pick(rand, culture.skin);
@@ -101,10 +104,9 @@ export function generateAppearance(rand, cultureId) {
 }
 
 /** Age column for a class per JJ 248's class groups. */
-function ageColumnFor(classKey) {
-  const table = getTable("people", "ageByClass");
+function ageColumnFor(table, classKey) {
   const wanted = String(classKey ?? "").toLowerCase();
-  for (const [column, classes] of Object.entries(table.classGroups)) {
+  for (const [column, classes] of Object.entries(table.classGroups ?? {})) {
     if (classes.some((c) => wanted.includes(c))) return column;
   }
   return "noble";
@@ -112,11 +114,13 @@ function ageColumnFor(classKey) {
 
 /**
  * Plausible age for a candidate of a level/class: the JJ minimum for the
- * class group plus small variance; 0th level = young adult.
+ * class group plus small variance; 0th level = young adult. When the age
+ * table has not been imported, every candidate is a young adult (18+).
  */
 export function generateAge(rand, level, classKey) {
-  const table = getTable("people", "ageByClass");
-  const column = table.columns[ageColumnFor(classKey)];
+  const table = optTable("people", "ageByClass");
+  if (!table) return 18 + Math.floor(rand() * 7);
+  const column = table.columns[ageColumnFor(table, classKey)];
   const base = Number(column?.[String(Math.max(0, Math.min(14, level ?? 0)))]) || 18;
   const variance = Math.floor(rand() * 7); // +0..6 years past the minimum
   return base + variance;
@@ -130,7 +134,8 @@ export function generateAge(rand, level, classKey) {
  * trajectory carries it, and the caste label alone is recorded.
  */
 export function generateOccupation(rand, race = "human") {
-  const table = getTable("people", "occupations");
+  const table = optTable("people", "occupations");
+  if (!table) return { category: "", occupation: "" };
   const raceTable = table.byRace?.[race];
   if (raceTable) {
     const category = pickWeighted(rand, raceTable.categories, (c) => c.weight);

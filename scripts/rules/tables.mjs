@@ -41,6 +41,24 @@ export function hasDoc(docId) {
   return !!globalThis.acksLib?.tables?.hasDoc(docId);
 }
 
+/**
+ * Table lookup that returns `null` instead of throwing when the document or
+ * table has not been imported yet. Callers that can degrade gracefully (a
+ * candidate's age, appearance, occupation, or class-distribution roll) use
+ * this so a market still rolls on partial coverage — as more of the book is
+ * imported, candidates simply gain detail. Features that truly require a
+ * table keep using getTable and surface the missing-tables notice.
+ */
+export function optTable(docId, tableId) {
+  const t = globalThis.acksLib?.tables;
+  if (!t?.hasDoc(docId)) return null;
+  try {
+    return t.getTable(docId, tableId);
+  } catch {
+    return null;
+  }
+}
+
 /** Register a document directly (rarely needed; imports use ruledata-import). */
 export function initTables(doc) {
   return reg().registerTable(doc);
