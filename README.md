@@ -58,6 +58,16 @@ Timekeeping (clock UI), acks-influence (reaction effects feed hiring rolls),
 acks-monsters (monster HD/values), acks-domains (market class from domain
 actors), socketlib.
 
+## Rules tables
+
+The book's tables — availability grids, wages, class rarity & distribution,
+cultures & names, followers, slavery costs — are **not distributed with this
+module**. They are imported once per world by a GM whose own ACKS II PDFs are
+connected (the acks-content import path, in development); imported tables
+persist in that world and serve every player in it. Until then the module
+loads cleanly but market, wage, and hiring automation stays disabled with a
+notice. This module is **not a substitute for the books**.
+
 ## Usage
 
 1. Create a **Location** actor (new actor type) per settlement; set urban
@@ -90,7 +100,7 @@ origin vX.Y.Z` — the workflow builds packs, validates, zips, and attaches
 
 ```
 scripts/          raw ESM (no bundler): entry, adapter, effects, rules/, engine/, apps/, chat/
-ruledata/         book-cited JSON tables (availability, rarity, wages, throws, followers…)
+ruledata/         NOT SHIPPED — book tables are imported per-world (see "Rules tables")
 templates/        Handlebars (dialogs, sheet, chat cards)
 packs/_source/    compendium JSON sources (compiled LevelDB in packs/)
 acks-rules/acks-henchmen/RULES.md     canonical rules extract with citations
@@ -112,7 +122,8 @@ Autarch LLC.
 
 **Registration #:** _[pending registration]_
 
-**Requires:** a legitimate copy of the ACKS II rules this module draws on —
-Adventurer Conqueror King System II (ACKS II), hireling, henchman & loyalty rules
-_[confirm exact publication title(s)]_. The module is not a substitute for the
-books and is free to use.
+**Requires:** legitimate copies of the ACKS II publications this module draws
+on — the **ACKS II Revised Rulebook** and **ACKS II Judges Journal**; optional
+content additionally draws on the **ACKS II Monstrous Manual** (monstrous
+henchmen) and **By This Axe** (dwarven cultures). The module is not a
+substitute for the books and is free to use.

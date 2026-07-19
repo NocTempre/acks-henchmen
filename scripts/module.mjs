@@ -67,15 +67,22 @@ Hooks.once("init", () => {
   }
 });
 
+/** Ruledata documents that failed to load this session (expected until the
+ * acks-content table import lands — book tables are no longer shipped). */
+const missingRuledata = [];
+
 Hooks.once("setup", async () => {
   // Load ruledata. All rules functions read through rules/tables.mjs so the
-  // data stays swappable (Node tests load the same JSON from disk).
+  // data stays swappable (Node tests load the same JSON from disk). The
+  // files are not shipped: book tables arrive per-world via content import
+  // (see README "Rules tables"), so a missing file is a normal state.
   for (const id of RULEDATA) {
     try {
       const doc = await foundry.utils.fetchJsonWithTimeout(`modules/${MODULE_ID}/ruledata/${id}.json`);
       initTables(doc);
-    } catch (err) {
-      console.error(`${MODULE_ID} | failed to load ruledata/${id}.json`, err);
+    } catch {
+      missingRuledata.push(id);
+      console.warn(`${MODULE_ID} | ruledata/${id}.json not present — table-driven features stay disabled`);
     }
   }
 
@@ -143,6 +150,11 @@ Hooks.once("ready", () => {
   registerSockets();
   registerEventEngine();
   registerInfluenceIntegration();
+
+  // Book tables are imported per-world, not shipped. Tell the GM once.
+  if (missingRuledata.length && game.user.isGM) {
+    ui.notifications.warn(game.i18n.format("ACKS-HENCHMEN.tablesMissing", { list: missingRuledata.join(", ") }));
+  }
 
   // Location schema migration (GM): v2 moved availability from per-posting
   // pools to the location's shared market — old-shape postings/candidates
