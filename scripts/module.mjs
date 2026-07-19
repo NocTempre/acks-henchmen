@@ -11,7 +11,7 @@ import { MODULE_ID, LOCATION_TYPE, RULEDATA, HOOKS, SCHEMA_VERSION } from "./con
 import { installWageGuard, registerDeletionCleanup, sweepAtReady, repairWorld, repairActor, scanActor, describeRepair } from "./repair.mjs";
 import * as config from "./config.mjs";
 import { registerSettings, getSetting } from "./settings.mjs";
-import { initTables, getTable, getDoc } from "./rules/tables.mjs";
+import { getTable, getDoc, hasDoc } from "./rules/tables.mjs";
 import * as availabilityRules from "./rules/availability.mjs";
 import * as wageRules from "./rules/wages.mjs";
 import * as loyaltyRules from "./rules/loyalty.mjs";
@@ -74,24 +74,12 @@ Hooks.once("init", () => {
   }
 });
 
-/** Ruledata documents that failed to load this session (expected until the
- * acks-content table import lands — book tables are no longer shipped). */
-const missingRuledata = [];
-
 Hooks.once("setup", async () => {
-  // Load ruledata. All rules functions read through rules/tables.mjs so the
-  // data stays swappable (Node tests load the same JSON from disk). The
-  // files are not shipped: book tables arrive per-world via content import
-  // (see README "Rules tables"), so a missing file is a normal state.
-  for (const id of RULEDATA) {
-    try {
-      const doc = await foundry.utils.fetchJsonWithTimeout(`modules/${MODULE_ID}/ruledata/${id}.json`);
-      initTables(doc);
-    } catch {
-      missingRuledata.push(id);
-      console.warn(`${MODULE_ID} | ruledata/${id}.json not present — table-driven features stay disabled`);
-    }
-  }
+  // Book tables are NOT shipped and NOT fetched here. Every rules function
+  // reads through rules/tables.mjs, which delegates to the acks-lib registry
+  // (acksLib.tables). Tables arrive per world via acks-content extraction →
+  // the ruledata-import contract → acks-lib at world priority; acks-location
+  // mirrors the persisted set into the registry before this module's `ready`.
 
   // Public API: macros and other modules reach the module through here.
   const api = {
@@ -162,9 +150,17 @@ Hooks.once("ready", () => {
 
   if (getSetting("autoRepairReferences")) sweepAtReady();
 
-  // Book tables are imported per-world, not shipped. Tell the GM once.
-  if (missingRuledata.length && game.user.isGM) {
-    ui.notifications.warn(game.i18n.format("ACKS-HENCHMEN.tablesMissing", { list: missingRuledata.join(", ") }));
+  // Book tables are imported per-world, not shipped. If acks-lib is missing or
+  // some documents have not been imported yet, tell the GM once and name them.
+  if (game.user.isGM) {
+    if (!globalThis.acksLib?.tables) {
+      ui.notifications.error(game.i18n.localize("ACKS-HENCHMEN.libMissing"));
+    } else {
+      const missing = RULEDATA.filter((id) => !hasDoc(id));
+      if (missing.length) {
+        ui.notifications.warn(game.i18n.format("ACKS-HENCHMEN.tablesMissing", { list: missing.join(", ") }));
+      }
+    }
   }
 
   // Location schema migration (GM): v2 moved availability from per-posting

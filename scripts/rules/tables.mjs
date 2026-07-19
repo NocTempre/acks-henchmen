@@ -1,51 +1,47 @@
 /**
- * Table access for rules data. Pure module — no Foundry imports.
- * Ported from acks-domains module/rules/tables.mjs (same contract) so rules
- * functions stay unit-testable and the data source stays swappable: the
- * Foundry entry point loads `ruledata/*.json` via fetch and calls
- * `initTables()`; Node tooling loads the same JSON from disk.
+ * Table access — delegates to the acks-lib layered registry
+ * (`globalThis.acksLib.tables`). This module ships NO tables of its own: book
+ * tables are imported per world through acks-content extraction
+ * (→ the `ruledata-import` contract → acks-lib at world priority). These thin
+ * wrappers keep the ~14 rules call sites (getTable/getDoc/getThrowDef/
+ * bracketRow) unchanged, so a table read is identical whether the data came
+ * from an import, a premium catalog, or (future) a sample layer.
+ *
+ * Pure delegation, resolved at call time — acks-lib is `requires`d and sets
+ * `globalThis.acksLib` at module evaluation, before any of these run.
  */
-
-const _data = new Map();
-
-/** Register one parsed ruledata document (must carry `id`). */
-export function initTables(doc) {
-  if (!doc?.id) throw new Error("initTables: invalid ruledata document");
-  _data.set(doc.id, doc);
+function reg() {
+  const t = globalThis.acksLib?.tables;
+  if (!t) throw new Error("acks-henchmen: acks-lib (>=0.7.0) is required but not active");
+  return t;
 }
 
-/** Remove all registered ruledata (tests). */
-export function resetTables() {
-  _data.clear();
-}
-
-/** @returns {object} the whole ruledata document */
+/** @returns {object} the whole ruledata document (highest registry layer) */
 export function getDoc(docId) {
-  const doc = _data.get(docId);
-  if (!doc) throw new Error(`getDoc: ruledata "${docId}" not loaded`);
-  return doc;
+  return reg().getDoc(docId);
 }
 
 /** @returns {object} one table of a ruledata document */
 export function getTable(docId, tableId) {
-  const doc = getDoc(docId);
-  const table = doc.tables?.[tableId];
-  if (!table) throw new Error(`getTable: no table "${tableId}" in ruledata "${docId}"`);
-  return table;
+  return reg().getTable(docId, tableId);
 }
 
 /** @returns {object} one throw definition of a ruledata document */
 export function getThrowDef(docId, throwId) {
-  const doc = getDoc(docId);
-  const def = doc.throws?.[throwId];
-  if (!def) throw new Error(`getThrowDef: no throw "${throwId}" in ruledata "${docId}"`);
-  return def;
+  return reg().getThrowDef(docId, throwId);
 }
 
-/**
- * Find the row of a bracket table whose [min, max] contains `value`.
- * Rows with a null/undefined max are open-ended.
- */
+/** Bracket-table row lookup (null max = open-ended). */
 export function bracketRow(rows, value, minKey = "min", maxKey = "max") {
-  return rows.find((r) => value >= (r[minKey] ?? -Infinity) && (r[maxKey] == null || value <= r[maxKey]));
+  return reg().bracketRow(rows, value, minKey, maxKey);
+}
+
+/** True when a ruledata document is present in the registry. */
+export function hasDoc(docId) {
+  return !!globalThis.acksLib?.tables?.hasDoc(docId);
+}
+
+/** Register a document directly (rarely needed; imports use ruledata-import). */
+export function initTables(doc) {
+  return reg().registerTable(doc);
 }
