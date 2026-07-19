@@ -11,7 +11,8 @@ import { MODULE_ID, LOCATION_TYPE, RULEDATA, HOOKS, SCHEMA_VERSION } from "./con
 import { installWageGuard, registerDeletionCleanup, sweepAtReady, repairWorld, repairActor, scanActor, describeRepair } from "./repair.mjs";
 import * as config from "./config.mjs";
 import { registerSettings, getSetting } from "./settings.mjs";
-import { getTable, getDoc, hasDoc } from "./rules/tables.mjs";
+import { getTable, getDoc, hasDoc, initTables } from "./rules/tables.mjs";
+import { THROWS_DATA } from "./data/throws-data.mjs";
 import * as availabilityRules from "./rules/availability.mjs";
 import * as wageRules from "./rules/wages.mjs";
 import * as loyaltyRules from "./rules/loyalty.mjs";
@@ -80,6 +81,18 @@ Hooks.once("setup", async () => {
   // (acksLib.tables). Tables arrive per world via acks-content extraction →
   // the ruledata-import contract → acks-lib at world priority; acks-location
   // mirrors the persisted set into the registry before this module's `ready`.
+  //
+  // The exception is `throws`: this module's own social-roll automation config
+  // (module vocabulary, not book data), shipped and registered at SAMPLE
+  // priority so hiring/loyalty/obedience rolls work with no import. A catalog
+  // or world may still override the `throws` doc by id.
+  if (globalThis.acksLib?.tables) {
+    try {
+      initTables(THROWS_DATA);
+    } catch (err) {
+      console.error(`${MODULE_ID} | failed to register throws automation`, err);
+    }
+  }
 
   // Public API: macros and other modules reach the module through here.
   const api = {

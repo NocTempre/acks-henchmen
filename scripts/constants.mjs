@@ -16,12 +16,15 @@ export const FLAG_RETAIN_BONUS = "retainBonus";
 /** Socket channel (native game.socket; socketlib used instead when active). */
 export const SOCKET_CHANNEL = `module.${MODULE_ID}`;
 
-/** Ruledata document ids (one per ruledata/*.json file). */
+/**
+ * Book-table document ids expected from per-world import (acks-content
+ * extraction). `throws` is NOT here — it is this module's own roll-automation
+ * config, shipped in scripts/data/throws-data.mjs and registered at setup.
+ */
 export const RULEDATA = Object.freeze([
   "availability",
   "rarity",
   "wages",
-  "throws",
   "followers",
   "settlement",
   "monsters",
