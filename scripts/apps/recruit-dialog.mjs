@@ -1,7 +1,7 @@
 /* global game, ui, foundry, ChatMessage, Hooks */
 /**
  * Recruit flow — the Reaction to Hiring Offer (RR 162) for market candidates
- * AND special hires (real actors). When acks-influence v1.3+ is active the
+ * AND special hires (real actors). When acks-influence hosts the modes (apiVersion 3+) the
  * roll renders as an influence-hosted "hiring" page (consistent UI, auto
  * subject/target detection, core tones hidden); otherwise the module's own
  * ThrowDialog carries it. Every attempt is tracked PER NPC (refusals build

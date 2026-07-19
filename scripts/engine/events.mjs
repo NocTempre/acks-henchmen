@@ -102,7 +102,7 @@ export async function applyLoyaltyOutcome(actor, { outcome, total = null, note =
 
 /**
  * Open the secret Hireling Loyalty roll for a hireling — as an influence-
- * hosted page when acks-influence v1.3+ is active (consistent UI, tones
+ * hosted page when acks-influence hosts the modes (consistent UI, tones
  * hidden), else the module's own ThrowDialog. Outcome bookkeeping applies
  * automatically either way.
  * @param {Actor} actor - the hireling
@@ -151,6 +151,23 @@ export function openLoyaltyRoll(actor, opts = {}) {
 /** Open the secret Hireling Obedience throw (RR 167). */
 export function openObedienceRoll(actor, opts = {}) {
   const employer = adapter.getManager(actor);
+
+  // Influence-hosted page when available (apiVersion 6+), same as loyalty.
+  try {
+    const integration = globalThis.acksHenchmen?.integrations?.influence;
+    if (integration?.hostsMoraleModes?.()) {
+      integration.openObedienceViaInfluence({
+        employer,
+        hireling: actor,
+        effectiveMorale: effectiveMoraleFor(actor),
+        context: { actorUuid: actor.uuid, reason: opts.reason ?? "" },
+      });
+      return;
+    }
+  } catch (err) {
+    console.warn("acks-henchmen | influence-hosted obedience open failed; falling back", err);
+  }
+
   const dynamicModifiers = employer ? toDialogModifiers(collectEffectModifiers(employer, "obedienceRoll")) : [];
   // The employer's morale-modifier effects (Command, Battlefield Prowess…)
   // condition on presence/leadership — offered as toggles on the roll.
@@ -160,25 +177,29 @@ export function openObedienceRoll(actor, opts = {}) {
     actor,
     derived: { moraleScore: effectiveMoraleFor(actor) },
     dynamicModifiers,
-    onResolve: async (result) => {
-      await HenchmanRecord.logEvent(actor, {
-        type: "obedienceRoll",
-        note: opts.reason ?? "",
-        rollTotal: result.total,
-        outcome: result.outcome,
-      });
-      if (result.outcome === "refuses") {
-        await postEventCard({
-          titleKey: "ACKS-HENCHMEN.card.refusesTitle",
-          bodyKey: "ACKS-HENCHMEN.card.refusesBody",
-          data: { name: actor.name },
-          buttons: [
-            { action: "insistOrder", label: "ACKS-HENCHMEN.card.insist", icon: "fas fa-gavel", payload: { actorUuid: actor.uuid } },
-          ],
-          actor,
-        });
-      }
-    },
+    onResolve: (result) =>
+      applyObedienceOutcome(actor, { outcome: result.outcome, total: result.total, note: opts.reason ?? "" }),
+  });
+}
+
+/**
+ * Apply an obedience result — log it, and on a refusal offer the "insist"
+ * card (RR 167: insisting costs 1 permanent loyalty and forces a reroll).
+ *
+ * Shared by the module's own ThrowDialog and the influence-hosted page, so the
+ * consequences do not depend on which UI produced the roll.
+ */
+export async function applyObedienceOutcome(actor, { outcome, total, note = "" } = {}) {
+  await HenchmanRecord.logEvent(actor, { type: "obedienceRoll", note, rollTotal: total, outcome });
+  if (outcome !== "refuses") return;
+  await postEventCard({
+    titleKey: "ACKS-HENCHMEN.card.refusesTitle",
+    bodyKey: "ACKS-HENCHMEN.card.refusesBody",
+    data: { name: actor.name },
+    buttons: [
+      { action: "insistOrder", label: "ACKS-HENCHMEN.card.insist", icon: "fas fa-gavel", payload: { actorUuid: actor.uuid } },
+    ],
+    actor,
   });
 }
 

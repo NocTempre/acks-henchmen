@@ -2,14 +2,14 @@
 /**
  * acks-influence integration (soft — everything is guarded).
  *
- * With acks-influence v1.3.0+ (apiVersion 3) the HIRING and LOYALTY rolls
- * render inside the influence app as external-mode pages (consistent UI,
- * auto-derived subject/target features, effect-granted modifiers, the
- * three core tones hidden). This module supplies ctx (signing-bonus
- * options, refusal/slander counts, effective loyalty) and applies the
- * consequences when `acksInfluenceRollComplete` fires with our context.
- * Without influence (or on an older apiVersion) everything falls back to
- * the module's own ThrowDialog.
+ * With acks-influence apiVersion 3+ the HIRING and LOYALTY rolls render inside
+ * the influence app as external-mode pages (consistent UI, auto-derived
+ * subject/target features, effect-granted modifiers, the three core tones
+ * hidden); apiVersion 6+ adds OBEDIENCE and the IRREFUSABLE OFFER. This module
+ * supplies ctx (signing-bonus options, refusal/slander counts, effective
+ * loyalty and morale) and applies the consequences when
+ * `acksInfluenceRollComplete` fires with our context. Without influence (or on
+ * an older apiVersion) everything falls back to the module's own ThrowDialog.
  *
  * Also consumed: `flags.acks-influence.reaction` Active Effects feed hiring
  * throws (scripts/effects.mjs); influence rolls AGAINST managed hirelings
@@ -30,6 +30,49 @@ export function influenceApi() {
 /** True when influence can host the hiring/loyalty pages (apiVersion 3+). */
 export function hostsModes() {
   return (influenceApi()?.apiVersion ?? 0) >= 3;
+}
+
+/**
+ * True when influence also hosts the morale-family pages — Hireling Obedience
+ * and the Irrefusable Offer (apiVersion 6+).
+ */
+export function hostsMoraleModes() {
+  return (influenceApi()?.apiVersion ?? 0) >= 6;
+}
+
+/**
+ * Open the secret Hireling Obedience throw (RR 167) as an influence-hosted
+ * page. The morale score comes from this module's record (base + permanents),
+ * which the sheet alone does not know.
+ */
+export function openObedienceViaInfluence(o) {
+  const api = influenceApi();
+  if (!api) return null;
+  return api.open(o.employer ?? null, {
+    mode: "obedience",
+    targetActor: o.hireling ?? null,
+    ctx: {
+      effectiveMorale: o.effectiveMorale ?? 0,
+      targetName: o.hireling?.name ?? "",
+      targetImg: o.hireling?.img ?? "",
+    },
+    context: { module: MODULE_ID, ...o.context },
+  });
+}
+
+/** Open the Irrefusable Offer (MM 351) for a captured monster. */
+export function openIrrefusableViaInfluence(o) {
+  const api = influenceApi();
+  if (!api) return null;
+  return api.open(o.employer ?? null, {
+    mode: "irrefusableOffer",
+    targetActor: o.monster ?? null,
+    ctx: {
+      targetName: o.monster?.name ?? "",
+      targetImg: o.monster?.img ?? "",
+    },
+    context: { module: MODULE_ID, ...o.context },
+  });
 }
 
 /**
@@ -103,6 +146,16 @@ export function registerInfluenceIntegration() {
           const actor = context.actorUuid ? await fromUuid(context.actorUuid) : null;
           if (actor) {
             await applyLoyaltyOutcome(actor.actor ?? actor, {
+              outcome: payload.outcome,
+              total: payload.total,
+              note: context.reason ?? "",
+            });
+          }
+        } else if (payload.mode === "obedience") {
+          const { applyObedienceOutcome } = await import("../engine/events.mjs");
+          const actor = context.actorUuid ? await fromUuid(context.actorUuid) : null;
+          if (actor) {
+            await applyObedienceOutcome(actor.actor ?? actor, {
               outcome: payload.outcome,
               total: payload.total,
               note: context.reason ?? "",

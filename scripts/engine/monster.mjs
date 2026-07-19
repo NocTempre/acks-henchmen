@@ -63,6 +63,26 @@ export function recruitMonster(monster, employer, { captured = false } = {}) {
     return;
   }
   const throwId = captured ? "irrefusableOffer" : "reactionToHiring";
+
+  // The captured-monster offer is influence-hosted when available (apiVersion
+  // 6+); the peaceful offer is an ordinary hiring reaction and already routes
+  // through the hiring page elsewhere.
+  if (captured) {
+    try {
+      const integration = globalThis.acksHenchmen?.integrations?.influence;
+      if (integration?.hostsMoraleModes?.()) {
+        integration.openIrrefusableViaInfluence({
+          employer,
+          monster,
+          context: { actorUuid: monster.uuid, employerUuid: employer.uuid },
+        });
+        return;
+      }
+    } catch (err) {
+      console.warn("acks-henchmen | influence-hosted irrefusable offer failed; falling back", err);
+    }
+  }
+
   const dynamicModifiers = toDialogModifiers(collectEffectModifiers(employer, "hiring"));
   openThrowDialog(throwId, {
     title: `${monster.name} — ${employer.name}`,
