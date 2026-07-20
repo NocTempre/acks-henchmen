@@ -33,7 +33,7 @@ import { parseAvailability } from "../rules/dice.mjs";
 import { rollClassFromDistribution, rollTrajectoryFromDistribution, rollRandomLevel, rollProficiencyLevel } from "../rules/candidates.mjs";
 import { generateIdentity, classInfo } from "../rules/identity.mjs";
 import { henchmanWage } from "../rules/wages.mjs";
-import { getTable } from "../rules/tables.mjs";
+import { getTable, optTable } from "../rules/tables.mjs";
 import { sumEffectModifiers } from "../effects.mjs";
 import * as adapter from "../acks-adapter.mjs";
 import { registerSocketAction } from "../sockets.mjs";
@@ -76,7 +76,7 @@ export function effectiveMarketClass(location, employer) {
 function isMassSpec(spec) {
   if (spec.kind === "mercenary") return true;
   if (spec.kind !== "specialist") return false;
-  const row = getTable("availability", "specialistAvailability").rows.find((r) => r.type === spec.specialistType);
+  const row = (optTable("availability", "specialistAvailability")?.rows ?? []).find((r) => r.type === spec.specialistType);
   const parsed = row ? parseAvailability(row.byMarketClass[0]) : null;
   return !!parsed && parsed.mult > 1;
 }
@@ -133,8 +133,8 @@ async function buildCandidates({ location, spec, total, marketClass, segment, pr
       }
       const row =
         spec.kind === "mercenary"
-          ? getTable("wages", "mercenaryWages").rows.find((r) => r.type === wageType)
-          : getTable("availability", "specialistAvailability").rows.find((r) => r.type === spec.specialistType);
+          ? (optTable("wages", "mercenaryWages")?.rows ?? []).find((r) => r.type === wageType)
+          : (optTable("availability", "specialistAvailability")?.rows ?? []).find((r) => r.type === spec.specialistType);
       const mercWage = row?.wages ? (row.wages.man ?? Object.values(row.wages).find((w) => w != null) ?? null) : null;
       candidates.push({
         ...base,
@@ -189,7 +189,7 @@ async function buildCandidates({ location, spec, total, marketClass, segment, pr
           : "";
         candidate.wageGp = henchmanWage(candidate.level ?? 0);
       } else if (spec.kind === "specialist") {
-        const row = getTable("availability", "specialistAvailability").rows.find(
+        const row = (optTable("availability", "specialistAvailability")?.rows ?? []).find(
           (r) => r.type === spec.specialistType
         );
         candidate.wageGp = row?.wage ?? null;
@@ -231,11 +231,11 @@ async function buildCandidates({ location, spec, total, marketClass, segment, pr
 export function allSegmentSpecs(location) {
   const specs = [];
   for (let level = 0; level <= 4; level++) specs.push({ kind: "henchman", level });
-  for (const row of getTable("availability", "mercenaryAvailability").rows) {
+  for (const row of optTable("availability", "mercenaryAvailability")?.rows ?? []) {
     if (row.desert && !location.system.desertRealm) continue;
     specs.push({ kind: "mercenary", troopType: row.type });
   }
-  for (const row of getTable("availability", "specialistAvailability").rows) {
+  for (const row of optTable("availability", "specialistAvailability")?.rows ?? []) {
     specs.push({ kind: "specialist", specialistType: row.type });
   }
   return specs;
@@ -327,7 +327,7 @@ export async function createPosting(location, rawSpec, employer, { dedicatedSear
   if (spec.kind === "henchmanByClass" && !spec.alignmentShift) {
     const classAlignment = classInfo(spec.classKey)?.alignment;
     if (classAlignment) {
-      const shifts = getTable("rarity", "alignmentRecruitment").shifts;
+      const shifts = optTable("rarity", "alignmentRecruitment")?.shifts ?? {};
       spec.alignmentShift = shifts[location.system.settlementAlignment ?? "lawful"]?.[classAlignment] ?? 0;
     }
   }
