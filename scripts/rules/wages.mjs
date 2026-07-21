@@ -55,9 +55,12 @@ export function maxHenchmanLevel(employerLevel, isDomainRuler = false) {
 export function signingBonusCost(tier, monthlyWage, briberyProficient) {
   const table = optTable("wages", "signingBonus");
   if (!table) return null; // dialog omits signing-bonus tiers until imported
-  const rows = briberyProficient ? table.proficient : table.nonProficient;
-  const row = rows.find((r) => r.bonus === tier);
-  if (!row) return null;
+  const side = briberyProficient ? table.proficient : table.nonProficient;
+  // Imported shape is a tier→period map ({"1":"day"…}); the legacy reference
+  // shape was an array of {bonus, wages}. Accept both.
+  const period = Array.isArray(side) ? side.find((r) => r.bonus === tier)?.wages : side?.[String(tier)];
+  if (!period) return null;
+  const row = { wages: period };
   // Family-standard pay conversions (RAW names the periods, not the math):
   // a week's pay = monthly / 4, a day's = monthly / 30 — matching the
   // influence module's bribe tiers so both rollers price identically.
