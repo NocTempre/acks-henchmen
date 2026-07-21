@@ -2,22 +2,22 @@
  * Slavery rules (JJ 409-411) — OPTIONAL, gated behind the `enableSlavery`
  * world setting. Pure module; all content isolated here + ruledata/slavery.json.
  */
-import { getTable } from "./tables.mjs";
+import { optTable } from "./tables.mjs";
 
 /** Purchase cost + upkeep + loyalty/morale presets for a common slave type. */
 export function commonSlave(type) {
-  return getTable("slavery", "commonSlaves").rows.find((r) => r.type === type) ?? null;
+  return (optTable("slavery", "commonSlaves")?.rows ?? []).find((r) => r.type === type) ?? null;
 }
 
 /** Purchase cost for a slave soldier of a troop type and race. */
 export function slaveTroopCost(troopType, race = "man") {
-  const row = getTable("slavery", "slaveTroopCosts").rows.find((r) => r.type === troopType);
+  const row = (optTable("slavery", "slaveTroopCosts")?.rows ?? []).find((r) => r.type === troopType);
   return row?.costs?.[race] ?? null;
 }
 
 /** Monthly upkeep for slave soldiers (ogres cost more; missing it = calamity). */
 export function slaveUpkeep(race = "man") {
-  const rules = getTable("slavery", "soldierRules").upkeep;
+  const rules = optTable("slavery", "soldierRules")?.upkeep ?? {};
   return race === "ogre" ? rules.ogre : rules.default;
 }
 

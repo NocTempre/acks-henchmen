@@ -16,21 +16,22 @@ export function henchmanWage(level) {
 
 /** Monthly wage for a mercenary troop type and race ("man" default). */
 export function mercenaryWage(troopType, race = "man") {
-  const row = getTable("wages", "mercenaryWages").rows.find((r) => r.type === troopType);
+  const row = (optTable("wages", "mercenaryWages")?.rows ?? []).find((r) => r.type === troopType);
   if (!row) return null;
   return row.wages[race] ?? null;
 }
 
 /** Base morale for a mercenary troop type (+1 for demi-humans). */
 export function mercenaryMorale(troopType, demiHuman = false) {
-  const row = getTable("wages", "mercenaryWages").rows.find((r) => r.type === troopType);
+  const row = (optTable("wages", "mercenaryWages")?.rows ?? []).find((r) => r.type === troopType);
   if (!row) return 0;
   return row.morale + (demiHuman ? 1 : 0);
 }
 
 /** Base morale for a specialist type (RR 166 role overrides, default -2). */
 export function specialistMorale(specialistType) {
-  const table = getTable("wages", "baseMorale");
+  const table = optTable("wages", "baseMorale");
+  if (!table) return 0; // neutral until the wages tables are imported
   return table.overrides[specialistType] ?? table.specialistDefault;
 }
 
@@ -38,7 +39,9 @@ export function specialistMorale(specialistType) {
 export function maxHenchmanLevel(employerLevel, isDomainRuler = false) {
   if (isDomainRuler) return Math.max(0, employerLevel - 1);
   if (employerLevel >= 7) return 4 + (employerLevel - 7);
-  const row = getTable("wages", "employerLevelCap").rows.find((r) => r.employerLevel === employerLevel);
+  const rows = optTable("wages", "employerLevelCap")?.rows;
+  if (!rows) return Math.max(0, employerLevel - 1); // uncapped-ish until imported
+  const row = rows.find((r) => r.employerLevel === employerLevel);
   return row ? row.maxHenchmanLevel : 0;
 }
 
@@ -50,7 +53,8 @@ export function maxHenchmanLevel(employerLevel, isDomainRuler = false) {
  * @returns {{gp: number, wages: string}|null}
  */
 export function signingBonusCost(tier, monthlyWage, briberyProficient) {
-  const table = getTable("wages", "signingBonus");
+  const table = optTable("wages", "signingBonus");
+  if (!table) return null; // dialog omits signing-bonus tiers until imported
   const rows = briberyProficient ? table.proficient : table.nonProficient;
   const row = rows.find((r) => r.bonus === tier);
   if (!row) return null;
@@ -68,7 +72,7 @@ export function expectedLivingExpenses(level) {
 
 /** Apparent level implied by a monthly spend (largest level whose wage ≤ spend). */
 export function apparentLevelFromSpend(gpPerMonth) {
-  const byLevel = getTable("wages", "henchmanWageByLevel").byLevel;
+  const byLevel = optTable("wages", "henchmanWageByLevel")?.byLevel ?? {};
   let apparent = 0;
   for (const [lvl, wage] of Object.entries(byLevel)) {
     if (gpPerMonth >= wage) apparent = Math.max(apparent, Number(lvl));
