@@ -195,7 +195,15 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
           name: masked ? game.i18n.localize("ACKS-HENCHMEN.candidate.masked") : c.name,
           cultureLabel: masked ? "" : (cultures[c.culture]?.label ?? c.culture ?? ""),
           identityLine,
-          appearanceTip: masked ? "" : c.appearance,
+          appearanceTip: masked
+            ? ""
+            : [
+                c.appearance,
+                c.hitDice ? game.i18n.format("ACKS-HENCHMEN.candidate.hitDice", { hd: c.hitDice }) : "",
+                c.profCount != null ? game.i18n.format("ACKS-HENCHMEN.candidate.profCount", { count: c.profCount }) : "",
+              ]
+                .filter(Boolean)
+                .join(" — "),
           isAggregate: (c.quantity ?? 1) > 1,
           isPrivate: !!c.privateToUuid,
           refusalCount: (c.refusals ?? []).length,

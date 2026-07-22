@@ -93,6 +93,8 @@ function candidateField() {
     age: num({ integer: true }),
     occupation: str(),
     appearance: str(),
+    hitDice: str(), // 0th-level HD line (JJ 252), e.g. "1/2 HD (1d4 hp)"
+    profCount: num({ integer: true }), // JJ 253 general-proficiency count by age
     kind: new fields.StringField({ required: true, initial: "henchman" }),
     quantity: int(1), // >1 only for aggregated troop-scale rows
     level: num({ integer: true }),

@@ -112,10 +112,23 @@ export function generateAppearance(rand, cultureId) {
   return `${hair} hair, ${eyes} eyes, ${skin} skin; ${culture.build}`;
 }
 
-/** Age column for a class per JJ 248's class groups. */
-function ageColumnFor(table, classKey) {
+/**
+ * Which JJ 248 age-trajectory column a class follows — interpretation, not
+ * page data: the table's own labels are Fighter/(noble), Crusader
+ * (proselytizer), Mage (researcher), Thief (carouser); classes map to the
+ * trajectory whose adventuring life they lead. Magistrate/commoner columns
+ * describe civilian careers, not adventuring classes.
+ */
+const AGE_CLASS_GROUPS = {
+  crusader: ["crusader", "bladedancer", "priestess", "shaman", "paladin", "dwarven craftpriest", "witch"],
+  mage: ["mage", "warlock", "nobiran wonderworker", "elven spellsword", "zaharan ruinguard"],
+  thief: ["thief", "assassin", "bard", "elven nightblade", "venturer"],
+  noble: ["fighter", "explorer", "barbarian", "dwarven vaultguard"],
+};
+
+function ageColumnFor(classKey) {
   const wanted = String(classKey ?? "").toLowerCase();
-  for (const [column, classes] of Object.entries(table.classGroups ?? {})) {
+  for (const [column, classes] of Object.entries(AGE_CLASS_GROUPS)) {
     if (classes.some((c) => wanted.includes(c))) return column;
   }
   return "noble";
@@ -123,16 +136,43 @@ function ageColumnFor(table, classKey) {
 
 /**
  * Plausible age for a candidate of a level/class: the JJ minimum for the
- * class group plus small variance; 0th level = young adult. When the age
+ * class group plus small variance; 0th level = young adult. A column that
+ * caps early ("44+") holds its cap value for higher levels. When the age
  * table has not been imported, every candidate is a young adult (18+).
  */
 export function generateAge(rand, level, classKey) {
-  const table = optTable("people", "ageByClass");
-  if (!table) return 18 + Math.floor(rand() * 7);
-  const column = table.columns[ageColumnFor(table, classKey)];
-  const base = Number(column?.[String(Math.max(0, Math.min(14, level ?? 0)))]) || 18;
+  const rows = optTable("people", "ageByClass")?.rows;
+  if (!rows?.length) return 18 + Math.floor(rand() * 7);
+  const column = ageColumnFor(classKey);
+  const L = Math.max(0, Math.min(14, level ?? 0));
+  let base = null;
+  for (let l = L; l >= 0 && base == null; l--) base = rows.find((r) => r.level === l)?.[column] ?? null;
   const variance = Math.floor(rand() * 7); // +0..6 years past the minimum
-  return base + variance;
+  return (Number(base) || 18) + variance;
+}
+
+/**
+ * 0th-level general proficiency COUNT by race and age (JJ 253). Races the
+ * table does not column (thrassian…) count as human. Null until imported.
+ */
+export function profCountFor(race, age) {
+  const rows = optTable("people", "proficienciesByAge")?.rows;
+  if (!rows?.length || !age) return null;
+  const col = rows.some((r) => Array.isArray(r[race])) ? race : "human";
+  const row = rows.find((r) => Array.isArray(r[col]) && age >= r[col][0] && age <= r[col][1]);
+  return row?.count ?? null;
+}
+
+/**
+ * 0th-level NPC hit dice (JJ 252) for a race and station. Stations:
+ * noncombatant | commoner | militia | fighter1. Races beyond the table's
+ * three rows use the human line. Null until imported.
+ */
+export function hd0For(race, station = "commoner") {
+  const rows = optTable("people", "hd0")?.rows;
+  if (!rows?.length) return null;
+  const row = rows.find((r) => r.race === race) ?? rows.find((r) => r.race === "human");
+  return row?.[station] ?? null;
 }
 
 /**
@@ -176,7 +216,32 @@ function generateOccupationRaw(rand) {
   return null;
 }
 
+/**
+ * BTA caste roll for dwarven candidates: the book gives Highborn/Craftborn/
+ * Workborn percentages in prose; the Oathsworn share is the remainder. The
+ * caste IS the recorded occupation — Craftborn/Workborn trades and Oathsworn
+ * orders are GM endpoints (the class trajectory carries an Oathsworn).
+ */
+function rollDwarvenCaste(rand, castes) {
+  const order = castes.order ?? ["highborn", "craftborn", "workborn", "oathsworn"];
+  const pcts = order.map((id) => castes[`${id}Pct`]);
+  const known = pcts.filter((v) => typeof v === "number");
+  if (!known.length) return null;
+  const remainder = Math.max(0, 100 - known.reduce((a, b) => a + b, 0));
+  let roll = rand() * 100;
+  for (let i = 0; i < order.length; i++) {
+    roll -= typeof pcts[i] === "number" ? pcts[i] : remainder;
+    if (roll <= 0) return castes.labels?.[order[i]] ?? order[i];
+  }
+  return castes.labels?.[order[order.length - 1]] ?? order[order.length - 1];
+}
+
 export function generateOccupation(rand, race = "human") {
+  if (race === "dwarf") {
+    const castes = optTable("people", "dwarvenCastes");
+    const caste = castes ? rollDwarvenCaste(rand, castes) : null;
+    if (caste) return { category: "caste", occupation: caste };
+  }
   const table = optTable("people", "occupations");
   if (!table) {
     const raw = generateOccupationRaw(rand);
@@ -218,7 +283,7 @@ export function generateTrajectoryClass(rand, level) {
  * @returns {{name, gender, culture, cultureLabel, age, appearance,
  *            occupation, occupationCategory, classKey}}
  */
-export function generateIdentity({ rand = Math.random, demographics = [], level = 0, classKey = "" } = {}) {
+export function generateIdentity({ rand = Math.random, demographics = [], level = 0, classKey = "", station = "commoner" } = {}) {
   const cultures = getTable("people", "cultures").list;
   // GENERATION ORDER: class → culture → sex → name/age/appearance. The
   // class was rolled FIRST (bucket distribution, engine-side); here it
@@ -237,15 +302,20 @@ export function generateIdentity({ rand = Math.random, demographics = [], level 
     occupation = occ.occupation;
     occupationCategory = occ.category;
   }
+  const age = generateAge(rand, level ?? 0, resolvedClass);
+  const race = raceOfCulture(culture);
   return {
     name: name.full,
     gender,
     culture,
     cultureLabel: cultures[culture]?.label ?? culture,
-    age: generateAge(rand, level ?? 0, resolvedClass),
+    age,
     appearance: generateAppearance(rand, culture),
     occupation,
     occupationCategory,
     classKey: resolvedClass,
+    // 0th-level physicals (JJ 252-253); null until those tables import.
+    profCount: (level ?? 0) <= 0 ? profCountFor(race, age) : null,
+    hitDice: (level ?? 0) <= 0 ? hd0For(race, station) : null,
   };
 }

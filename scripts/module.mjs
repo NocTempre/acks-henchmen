@@ -26,6 +26,7 @@ import { ThrowDialog, openThrowDialog } from "./apps/throw-dialog.mjs";
 import { openPostingDialog } from "./apps/posting-dialog.mjs";
 import { openRecruitDialog, openRecruitSpecial } from "./apps/recruit-dialog.mjs";
 import { createPosting, processLocation, processAllLocations, effectiveMarketClass } from "./engine/recruitment.mjs";
+import { postSlaveMarketCard, slaveryEnabled } from "./engine/slavery-market.mjs";
 import { hire, checkHenchmanLimit, addSpecialHire, hireExistingActor } from "./engine/hire.mjs";
 import * as candidateRules from "./rules/candidates.mjs";
 import * as identityRules from "./rules/identity.mjs";
@@ -138,6 +139,9 @@ Hooks.once("setup", async () => {
     getRecord: (actor) => HenchmanRecord.fromActor(actor),
     // rules (pure; slavery rules only function with enableSlavery on)
     rules: { ...availabilityRules, ...wageRules, ...loyaltyRules, ...diceRules, ...candidateRules, ...identityRules, slavery: slaveryRules },
+    // optional RAW slavery surface (setting-gated GM chat card)
+    postSlaveMarketCard,
+    slaveryEnabled,
     tables: { getTable, getDoc },
     // dangling-reference repair (core getTotalWages crash — see repair.mjs)
     repair: { repairWorld, repairActor, scanActor, describeRepair },

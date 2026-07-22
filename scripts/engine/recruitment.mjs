@@ -38,6 +38,7 @@ import { sumEffectModifiers } from "../effects.mjs";
 import * as adapter from "../acks-adapter.mjs";
 import { registerSocketAction } from "../sockets.mjs";
 import { now, secondsPerMonth } from "../time.mjs";
+import { postSlaveMarketCard } from "./slavery-market.mjs";
 
 /** Foundry dice bridge for the pure rules functions. */
 export async function rollDice(formula) {
@@ -201,12 +202,16 @@ async function buildCandidates({ location, spec, total, marketClass, segment, pr
         demographics,
         level: candidate.level ?? 0,
         classKey: spec.kind === "specialist" ? "" : candidate.classKey,
+        // JJ 252 station: mercenaries roll the militia/mercenary HD line.
+        station: spec.kind === "mercenary" ? "militia" : "commoner",
       });
       candidate.name = identity.name;
       candidate.gender = identity.gender;
       candidate.culture = identity.culture;
       candidate.age = identity.age;
       candidate.appearance = identity.appearance;
+      if (identity.hitDice) candidate.hitDice = identity.hitDice;
+      if (identity.profCount != null) candidate.profCount = identity.profCount;
       // Occupation + class trajectory belong ONLY to 0th-level henchman
       // prospects (JJ 247/254). A specialist's occupation IS their type;
       // leveled candidates have real classes already.
@@ -453,19 +458,23 @@ export async function processLocation(location, currentTime = now()) {
   // hiring or no hiring. Initialize on first contact; on rollover, purge
   // all public rows (hired candidates are actors now) and re-roll. When
   // multiple months elapsed unobserved, only the current one matters.
+  let monthRolled = false;
   if (!monthAnchorTime) {
     monthAnchorTime = currentTime;
     const month = await rollMonth(location, monthAnchorTime);
     candidates = [...candidates.filter((c) => c.privateToUuid), ...month.candidates];
     marketRolls = month.marketRolls;
-    changed = true;
+    changed = monthRolled = true;
   } else if (currentTime - monthAnchorTime >= secondsPerMonth()) {
     while (currentTime - monthAnchorTime >= secondsPerMonth()) monthAnchorTime += secondsPerMonth();
     const month = await rollMonth(location, monthAnchorTime);
     candidates = [...candidates.filter((c) => c.privateToUuid), ...month.candidates];
     marketRolls = month.marketRolls;
-    changed = true;
+    changed = monthRolled = true;
   }
+  // Optional RAW slavery (JJ 409): each fresh market month, remind the GM
+  // what the slave market offers. Gated by setting + imported tables.
+  if (monthRolled) await postSlaveMarketCard(location);
   // Keep active generic postings' info in sync with the current month.
   for (const posting of postings) {
     if (posting.status !== "active" || !posting.segment) continue;
