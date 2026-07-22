@@ -11,7 +11,7 @@
  * (scripts/facts.mjs): structures-module API → flag → inventory marker item
  * ("Stronghold: Castle", cost = value) → GM confirm.
  */
-import { getTable } from "../rules/tables.mjs";
+import { getTable, hasDoc } from "../rules/tables.mjs";
 import { getStronghold } from "../facts.mjs";
 import * as adapter from "../acks-adapter.mjs";
 import { gmIds } from "../acks-adapter.mjs";
@@ -33,6 +33,11 @@ async function rollTroopType(tableId) {
 }
 
 export async function openFollowersDialog(actor) {
+  if (!hasDoc("followers")) {
+    ui.notifications.warn("acks-henchmen: the followers tables are not imported yet (RR 334-337) - follower generation is disabled until then.");
+    return;
+  }
+
   const level = adapter.getLevel(actor);
   if (level < 9) {
     ui.notifications.warn(game.i18n.format("ACKS-HENCHMEN.followers.levelGate", { name: actor.name, level }));

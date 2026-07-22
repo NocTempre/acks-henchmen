@@ -2,7 +2,7 @@
  * Availability rules (RR 162-165, JJ 118-119). Pure module — dice arrive via
  * an injected async roller so Node tests stay deterministic.
  */
-import { getTable, bracketRow } from "./tables.mjs";
+import { getTable, optTable, bracketRow } from "./tables.mjs";
 import { rollAvailability, arrivalSplit } from "./dice.mjs";
 import { RARITY_TIERS } from "../config.mjs";
 
@@ -57,8 +57,9 @@ export function specialistExpr(type, marketClass) {
 
 /** Rarity tier of a class name within a rarity table variant. */
 export function classRarity(className, variant = "default") {
-  const variants = getTable("rarity", "classRarityTables").variants;
-  const tiers = (variants[variant] ?? variants.default).tiers;
+  const variants = optTable("rarity", "classRarityTables")?.variants;
+  const tiers = (variants?.[variant] ?? variants?.default)?.tiers;
+  if (!tiers) return null;
   const wanted = String(className).toLowerCase().trim();
   for (const [tier, classes] of Object.entries(tiers)) {
     if (classes.some((c) => c.toLowerCase() === wanted)) return tier;
@@ -81,7 +82,7 @@ export function shiftRarity(tier, shift) {
 
 /** Availability expression for a rarity tier in a market class (JJ 118). */
 export function rarityExpr(tier, marketClass) {
-  const row = getTable("rarity", "rarityAvailability").rows.find((r) => r.rarity === tier);
+  const row = (optTable("rarity", "rarityAvailability")?.rows ?? []).find((r) => r.rarity === tier);
   return row ? row.byMarketClass[clampMarketClass(marketClass) - 1] : null;
 }
 
@@ -132,7 +133,8 @@ export async function rollMonthlyPool(spec, marketClass, rollDice, rand = Math.r
     }
     case "henchmanByProficiency": {
       const ranks = Math.min(3, Math.max(1, spec.proficiencyRanks ?? 1));
-      const map = getTable("rarity", "specificQualificationMods").generalProficiency.ranksToRarity;
+      const map = optTable("rarity", "specificQualificationMods")?.generalProficiency?.ranksToRarity;
+      if (!map) return { error: "tables-missing" };
       let tier = map[String(ranks)];
       if (spec.commissioned) tier = shiftRarity(tier, -1) ?? tier;
       const expr = rarityExpr(tier, mc);

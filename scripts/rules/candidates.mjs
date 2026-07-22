@@ -66,7 +66,8 @@ export async function rollTrajectoryFromDistribution(rollDice, variant = "defaul
   if (!distribution) return rollCoreClass(rollDice, 0);
   const variants = getTable("rarity", "classRarityTables").variants;
   const buckets = variants[variant]?.buckets ?? distribution.buckets;
-  const weights = distribution.trajectoryBucketWeights.weights;
+  const weights = distribution.trajectoryBucketWeights?.weights;
+  if (!weights) return rollCoreClass(rollDice, 0); // JJ 247 weights not imported yet
   const total = Object.values(weights).reduce((s, w) => s + w, 0);
   const bucketRoll = await rollDice(`1d${total}`);
   let running = 0;
@@ -90,7 +91,9 @@ export async function rollTrajectoryFromDistribution(rollDice, variant = "defaul
  */
 export async function rollRandomLevel(rollDice, marketClass) {
   const table = getTable("rarity", "randomHenchmanLevel");
-  const penalty = marketClass === 6 ? table.classVIPenalty : 0;
+  // classVIPenalty is a book value not yet importable (JJ 118 prose) — no
+  // penalty until it lands, never a hardcoded stand-in.
+  const penalty = marketClass === 6 ? (table.classVIPenalty ?? 0) : 0;
   const die = await rollDice("1d20");
   const total = die + penalty;
   const row =
