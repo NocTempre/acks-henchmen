@@ -7,20 +7,23 @@ import { MODULE_ID, HOOKS, FLAG_RECORD } from "../constants.mjs";
 import { henchmanWage } from "../rules/wages.mjs";
 import { optTable } from "../rules/tables.mjs";
 
-/** Availability specialist ids → harvested package labels (JJ 254-257). */
+/** Normalized package key: lowercase alphanumerics (matches the harvest). */
+export const packageKey = (s) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+/** Availability specialist ids → harvested package keys (JJ 254-257). */
 const SPECIALIST_PACKAGE_KEYS = Object.freeze({
   alchemist: ["alchemist"],
-  animalTrainerCommon: ["animaltrainer (domestic)"],
-  animalTrainerWild: ["animaltrainer (wild)"],
-  animalTrainerGiant: ["animaltrainer (giant)"],
-  animalTrainerFantastic: ["animaltrainer (fantastic)"],
+  animalTrainerCommon: ["animaltrainerdomestic"],
+  animalTrainerWild: ["animaltrainerwild"],
+  animalTrainerGiant: ["animaltrainergiant"],
+  animalTrainerFantastic: ["animaltrainerfantastic"],
   armorer: ["armorer"],
   engineer: ["engineer"],
   healer: ["healer"],
-  healerPhysicker: ["healer (physicker)"],
-  healerChirurgeon: ["healer (chirugeon)", "healer (chirurgeon)"],
+  healerPhysicker: ["healerphysicker"],
+  healerChirurgeon: ["healerchirugeon", "healerchirurgeon"],
   marinerNavigator: ["navigator"],
-  marinerCaptain: ["shipcaptain", "ship captain"],
+  marinerCaptain: ["shipcaptain"],
   sage: ["sage"],
   lawyer: ["lawyer"],
 });
@@ -306,7 +309,7 @@ export async function hire(location, candidateId, employer, opts = {}) {
     const provider = globalThis.acksLib?.services?.get?.("ability-provider");
     const packs = optTable("people", "occupationPackages");
     const keys = candidate.occupation
-      ? [String(candidate.occupation).toLowerCase()]
+      ? [packageKey(candidate.occupation), packageKey(String(candidate.occupation).replace(/\(.*$/, ""))]
       : (SPECIALIST_PACKAGE_KEYS[candidate.specialistType] ?? []);
     const pack = packs ? keys.map((k) => packs[k]).find(Boolean) : null;
     if (provider && pack?.length) {

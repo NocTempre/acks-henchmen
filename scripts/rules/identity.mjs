@@ -142,17 +142,54 @@ export function generateAge(rand, level, classKey) {
  * dwarven Oathsworn) means the occupation IS the sworn order — the class
  * trajectory carries it, and the caste label alone is recorded.
  */
+/**
+ * RAW occupation roll (JJ ~229): d100 on the General/Street occupant column,
+ * route to that row's occupation sub-table, d100 there. Rows routed to an
+ * NPC class (thief/fighter/crusader) reroll — the book's own rule when only
+ * a civilian occupation is wanted. Returns null until both tables are
+ * imported.
+ */
+function generateOccupationRaw(rand) {
+  const types = optTable("people", "occupationTypes")?.rows;
+  const subs = optTable("people", "occupationSubTables")?.categories;
+  if (!types?.length || !subs) return null;
+  const routeKey = (resolve) => {
+    const t = String(resolve ?? "").toLowerCase();
+    if (t.includes("mage") || t.includes("magician")) return "magician";
+    for (const id of Object.keys(subs)) if (t.includes(id)) return id;
+    return null;
+  };
+  for (let tries = 0; tries < 12; tries++) {
+    const roll = Math.floor(rand() * 100) + 1;
+    const row = types.find((r) => {
+      const b = r.bands?.generalStreet;
+      return b && roll >= (b.min ?? 1) && roll <= (b.max ?? b.min ?? 100);
+    });
+    const cat = row ? routeKey(row.resolve) : null;
+    const rows = cat ? subs[cat]?.rows : null;
+    if (!rows?.length) continue; // class-routed / missing sub-table → reroll
+    const r2 = Math.floor(rand() * 100) + 1;
+    const occ = rows.find((x) => r2 >= (x.min ?? 1) && r2 <= (x.max ?? x.min ?? 100));
+    if (!occ?.occupation) continue;
+    return { category: cat, occupation: occ.occupation };
+  }
+  return null;
+}
+
 export function generateOccupation(rand, race = "human") {
   const table = optTable("people", "occupations");
   if (!table) {
+    const raw = generateOccupationRaw(rand);
+    if (raw) return raw;
     // The category table (JJ 252) is not imported yet; draw uniformly from
     // the harvested occupation packages so 0th candidates still get a trade
     // and a proficiency grant. Category WEIGHTS arrive with that table.
     const packs = optTable("people", "occupationPackages");
-    const keys = packs ? Object.keys(packs) : [];
+    const keys = packs ? Object.keys(packs).filter((k) => !k.startsWith("_")) : [];
     if (!keys.length) return { category: "", occupation: "" };
     const k = keys[Math.floor(rand() * keys.length)];
-    return { category: "", occupation: k.replace(/\b\w/g, (c) => c.toUpperCase()) };
+    const label = packs._labels?.[k] ?? k;
+    return { category: "", occupation: label.replace(/\b\w/g, (c) => c.toUpperCase()) };
   }
   const raceTable = table.byRace?.[race];
   if (raceTable) {
