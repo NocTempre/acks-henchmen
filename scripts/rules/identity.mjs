@@ -29,7 +29,13 @@ export function classInfo(classKey) {
 
 /** The race a class belongs to ("human" when the registry declares none). */
 export function raceForClass(classKey) {
-  return classInfo(classKey)?.race ?? "human";
+  const declared = classInfo(classKey)?.race;
+  if (declared) return declared;
+  // Until the class registry is importable, the race-bound classes announce
+  // their race in their own key ("elven spellsword", "dwarven vaultguard") —
+  // derive it so cultures align (no Zaharan humans, no elven vaultguards).
+  const m = String(classKey ?? "").toLowerCase().match(/^(elven|dwarven|zaharan|nobiran|thrassian)\b/);
+  return m ? { elven: "elf", dwarven: "dwarf", zaharan: "zaharan", nobiran: "nobiran", thrassian: "thrassian" }[m[1]] : "human";
 }
 
 /** Optional per-class culture whitelist (barbarians, shamans…). */
@@ -56,6 +62,9 @@ export function raceOfCulture(cultureId) {
  */
 export function pickCulture(rand, demographics, race = null, cultureWhitelist = null) {
   const cultures = getTable("people", "cultures").list;
+  // Nobiran are a human-passing bloodline of the empire — the book gives them
+  // Auran names rather than a list of their own.
+  if (race === "nobiran" && cultures.auran) return "auran";
   const matchesRace = (id) => {
     if (cultureWhitelist && !cultureWhitelist.includes(id)) return false;
     if (!race) return true;
