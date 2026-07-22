@@ -76,10 +76,11 @@
         </select>
       </div>
     </div>
-    <div class="demographics-block">
+    <div class="demographics-block" data-tooltip="{{localize 'ACKS-HENCHMEN.location.mixDropHint'}}">
       <label class="block-label" data-tooltip="{{localize 'ACKS-HENCHMEN.location.demographicsHint'}}">
         {{localize "ACKS-HENCHMEN.location.demographics"}}
         <a class="inline-add" data-action="addDemographic"><i class="fas fa-plus"></i></a>
+        <a class="inline-add" data-action="exportDemographics" data-tooltip="{{localize 'ACKS-HENCHMEN.location.mixExport'}}"><i class="fas fa-file-export"></i></a>
       </label>
       {{#each demographics}}
       <div class="demographic-row" data-demographic-index="{{index}}">
@@ -149,8 +150,8 @@
       </thead>
       <tbody>
         {{#each postings}}
-        <tr data-posting-id="{{id}}" class="{{#unless isActive}}inactive{{/unless}}">
-          <td data-tooltip="{{rollDetail}}">{{specLabel}}{{#if isPrivate}} <i class="fas fa-user-lock" data-tooltip="{{localize 'ACKS-HENCHMEN.posting.privateHint'}}"></i>{{/if}}{{#if commissioned}} <i class="fas fa-scroll" data-tooltip="{{localize 'ACKS-HENCHMEN.posting.commissioned'}}"></i>{{/if}}{{#if liedLevel}} <i class="fas fa-mask" data-tooltip="{{localize 'ACKS-HENCHMEN.posting.liedLevel'}} {{liedLevel}}"></i>{{/if}}</td>
+        <tr data-posting-id="{{id}}" class="{{#unless isActive}}inactive{{/unless}}{{#if advertVeteran}} advert-veteran{{/if}}">
+          <td data-tooltip="{{rollDetail}}">{{specLabel}}{{#if advertVeteran}} <i class="fas fa-bullhorn" data-tooltip="{{localize 'ACKS-HENCHMEN.posting.advertVeteranHint'}}"></i>{{/if}}{{#if isPrivate}} <i class="fas fa-user-lock" data-tooltip="{{localize 'ACKS-HENCHMEN.posting.privateHint'}}"></i>{{/if}}{{#if commissioned}} <i class="fas fa-scroll" data-tooltip="{{localize 'ACKS-HENCHMEN.posting.commissioned'}}"></i>{{/if}}{{#if liedLevel}} <i class="fas fa-mask" data-tooltip="{{localize 'ACKS-HENCHMEN.posting.liedLevel'}} {{liedLevel}}"></i>{{/if}}</td>
           <td>{{employerName}}</td>
           <td>{{feesTotal}} gp</td>
           <td>{{statusLabel}}</td>

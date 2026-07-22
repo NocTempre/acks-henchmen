@@ -10,6 +10,7 @@ import { getTable, optTable } from "../rules/tables.mjs";
 import { createPosting } from "../engine/recruitment.mjs";
 import { maxHenchmanLevel } from "../rules/wages.mjs";
 import * as adapter from "../acks-adapter.mjs";
+import { executeAsGM } from "../sockets.mjs";
 
 const { HandlebarsApplicationMixin, ApplicationV2 } = foundry.applications.api;
 
@@ -38,6 +39,7 @@ export class PostingDialog extends HandlebarsApplicationMixin(ApplicationV2) {
 
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
+    context.isGM = game.user.isGM;
     context.employers = game.actors
       .filter((a) => a.type === "character" && a.hasPlayerOwner && !a.system?.retainer?.enabled)
       .map((a) => ({ id: a.id, name: a.name, level: adapter.getLevel(a) }));
@@ -84,7 +86,7 @@ export class PostingDialog extends HandlebarsApplicationMixin(ApplicationV2) {
     const kind = data.kind;
     const spec = { kind };
 
-    if (kind === "henchman" || kind === "henchmanByClass") {
+    if (kind === "henchman" || kind === "henchmanByClass" || kind === "henchmanByProficiency") {
       spec.level = Number(data.level) || 0;
     }
     if (kind === "henchmanByClass") {
@@ -95,10 +97,29 @@ export class PostingDialog extends HandlebarsApplicationMixin(ApplicationV2) {
     if (kind === "henchmanByProficiency") {
       spec.proficiencyName = data.proficiencyName ?? "";
       spec.proficiencyRanks = Number(data.proficiencyRanks) || 1;
+      // JJ specific searches: +1 rarity per level above 1st, same as class posts.
+      spec.levelShift = Math.max(0, (Number(data.level) || 1) - 1);
       spec.commissioned = !!data.commissioned;
     }
     if (kind === "mercenary") spec.troopType = data.troopType;
     if (kind === "specialist") spec.specialistType = data.specialistType;
+
+    // A player's post names what they want: a criterion beyond a warm body,
+    // and the level on leveled searches — it sets the price (wage).
+    if (!game.user.isGM) {
+      if (kind === "henchman") {
+        ui.notifications.error(game.i18n.localize("ACKS-HENCHMEN.posting.error.criteria-required"));
+        return;
+      }
+      if ((kind === "henchmanByClass" || kind === "henchmanByProficiency") && !(spec.level >= 1)) {
+        ui.notifications.error(game.i18n.localize("ACKS-HENCHMEN.posting.error.level-required"));
+        return;
+      }
+      if (kind === "henchmanByProficiency" && !spec.proficiencyName.trim()) {
+        ui.notifications.error(game.i18n.localize("ACKS-HENCHMEN.posting.error.criteria-required"));
+        return;
+      }
+    }
 
     // RR 168: candidates judge the employer by appearance and spending —
     // the PRESENTED level (a lie, if it differs) governs who will sign on.
@@ -121,6 +142,20 @@ export class PostingDialog extends HandlebarsApplicationMixin(ApplicationV2) {
         );
         return;
       }
+    }
+
+    // Players cannot write the location actor — relay through the GM socket
+    // (ownership + criteria re-checked engine-side against requestUserId).
+    if (!game.user.isGM) {
+      await executeAsGM("createPosting", {
+        locationUuid: this.location.uuid,
+        spec,
+        employerUuid: employer?.uuid ?? "",
+        playersSeeDetails: data.playersSeeDetails !== false,
+        requestUserId: game.user.id,
+      });
+      ui.notifications.info(game.i18n.localize("ACKS-HENCHMEN.posting.submitted"));
+      return;
     }
 
     const result = await createPosting(this.location, spec, employer, {

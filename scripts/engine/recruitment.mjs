@@ -37,7 +37,7 @@ import { getTable, optTable } from "../rules/tables.mjs";
 import { sumEffectModifiers } from "../effects.mjs";
 import * as adapter from "../acks-adapter.mjs";
 import { registerSocketAction } from "../sockets.mjs";
-import { now, secondsPerMonth } from "../time.mjs";
+import { now, secondsPerMonth, calendarMonthStart, sameMarketMonth } from "../time.mjs";
 import { postSlaveMarketCard } from "./slavery-market.mjs";
 
 /** Foundry dice bridge for the pure rules functions. */
@@ -56,6 +56,37 @@ export function segmentKeyFor(spec) {
   if (spec.kind === "mercenary") return `mercenary:${spec.troopType}`;
   if (spec.kind === "specialist") return `specialist:${spec.specialistType}`;
   return "";
+}
+
+/* ------------------------- advert easing ------------------------- */
+/**
+ * A posting that has ADVERTISED THE SAME THING through a whole market month
+ * eases that search one rarity step toward common FOR THE WHOLE LOCATION —
+ * word gets around. The posting is designated (advertVeteran → post color);
+ * the easing applies to every matching directed roll while the advert runs.
+ */
+
+/** Easing key of a directed spec ("" for kinds with no rarity dimension). */
+export function specEaseKey(spec) {
+  if (spec.kind === "henchmanByClass") return `class:${String(spec.classKey ?? "").toLowerCase()}`;
+  if (spec.kind === "henchmanByProficiency") return `prof:${String(spec.proficiencyName ?? "").toLowerCase()}`;
+  return "";
+}
+
+/**
+ * Keys eased by the location's long-running adverts. `advertVeteran` is
+ * stamped at each monthly roll on postings that already existed when the
+ * month just ended BEGAN (they ran that whole month unchanged — a posting's
+ * spec is immutable); it keeps easing while the advert stays up.
+ */
+export function advertEasedKeys(postings) {
+  const keys = new Set();
+  for (const p of postings) {
+    if (p.status !== "active" || !p.advertVeteran) continue;
+    const key = specEaseKey(p.spec?.toObject?.() ?? p.spec ?? {});
+    if (key) keys.add(key);
+  }
+  return keys;
 }
 
 /**
@@ -174,10 +205,16 @@ async function buildCandidates({ location, spec, total, marketClass, segment, pr
         }
         candidate.wageGp = henchmanWage(candidate.level ?? 0);
       } else if (spec.kind === "henchmanByProficiency") {
-        const lvl = await rollProficiencyLevel(rollDice, clampMarketClass(marketClass));
-        candidate.level = lvl.level;
-        if (lvl.level > 0) {
-          const cls = await rollClassFromDistribution(rollDice, variant, lvl.level);
+        // A leveled proficiency post finds candidates AT that level (the
+        // level set the search's rarity); unleveled (GM tool) rolls it.
+        if (spec.level >= 1) {
+          candidate.level = spec.level;
+        } else {
+          const lvl = await rollProficiencyLevel(rollDice, clampMarketClass(marketClass));
+          candidate.level = lvl.level;
+        }
+        if (candidate.level > 0) {
+          const cls = await rollClassFromDistribution(rollDice, variant, candidate.level);
           candidate.classKey = cls.classKey;
           candidate.doubleD100 = cls.rolls;
         } else {
@@ -319,13 +356,27 @@ async function chargeWeeklyFee(location, employer, week = 1) {
  * specification per recruiter, at the recruiter's effective market class,
  * capped by base henchman availability).
  */
-export async function createPosting(location, rawSpec, employer, { dedicatedSearcherUuid = "", playersSeeDetails = true } = {}) {
+export async function createPosting(location, rawSpec, employer, { dedicatedSearcherUuid = "", playersSeeDetails = true, requestUserId = null } = {}) {
   const currentTime = now();
   // presentedLevel travels on the POSTING (RR 168 lie), not the spec — keep
   // it out of spec comparisons and storage.
   const { presentedLevel = null, ...spec } = rawSpec;
   const isPrivate = PRIVATE_KINDS.includes(spec.kind);
   const segment = isPrivate ? "" : segmentKeyFor(spec);
+
+  // Player posts name WHAT they want: at least one criterion beyond a warm
+  // body, and (for leveled searches) the level — it sets the price. Plain
+  // "any henchman of level X" posts are a GM tool. Enforced here so socket
+  // relays cannot bypass the dialog.
+  if (requestUserId) {
+    const user = game.users.get(requestUserId);
+    if (user && !user.isGM) {
+      const employerActor = employer?.actor ?? employer;
+      if (!employerActor || !employerActor.testUserPermission(user, "OWNER")) return { error: "not-yours" };
+      if (spec.kind === "henchman") return { error: "criteria-required" };
+      if (isPrivate && !(Number(spec.level) >= 1)) return { error: "level-required" };
+    }
+  }
 
   // Alignment openness (directed class searches): an opposed-alignment
   // class is harder to recruit openly — rarity shift per the table.
@@ -349,7 +400,7 @@ export async function createPosting(location, rawSpec, employer, { dedicatedSear
         p.status === "active" &&
         p.employerUuid === (employer?.uuid ?? "") &&
         JSON.stringify(p.spec.toObject?.() ?? p.spec) === specKey &&
-        currentTime - p.monthStartTime < secondsPerMonth()
+        sameMarketMonth(p.monthStartTime, currentTime)
     );
     if (dup) return { error: "duplicate-spec-this-month" };
   }
@@ -379,7 +430,10 @@ export async function createPosting(location, rawSpec, employer, { dedicatedSear
 
   if (isPrivate) {
     const mc = effectiveMarketClass(location, employer);
-    const result = await rollMonthlyPool(spec, mc, rollDice, Math.random, location.system.classRarityTableId || "default");
+    // A long-running advert for the same thing eases the whole location.
+    // Roll-time copy: the eased flag never enters the stored spec.
+    const rollSpec = advertEasedKeys(postings).has(specEaseKey(spec)) ? { ...spec, advertEased: true } : spec;
+    const result = await rollMonthlyPool(rollSpec, mc, rollDice, Math.random, location.system.classRarityTableId || "default");
     if (result.error) return { error: result.error };
     let total = result.quantity;
     // JJ: capped by the market's base henchman availability.
@@ -455,18 +509,36 @@ export async function processLocation(location, currentTime = now()) {
   const arrivals = new Map();
 
   // 0. Month anchor: the WHOLE market rolls at the start of every month,
-  // hiring or no hiring. Initialize on first contact; on rollover, purge
-  // all public rows (hired candidates are actors now) and re-roll. When
-  // multiple months elapsed unobserved, only the current one matters.
+  // hiring or no hiring. With a world calendar the market month IS the
+  // calendar month (anchor = the month's first second, so week-1 arrivals
+  // land in its first week); day-counted months are the fallback. Initialize
+  // on first contact; on rollover, purge all public rows (hired candidates
+  // are actors now) and re-roll. Multiple unobserved months: only the
+  // current one matters.
   let monthRolled = false;
-  if (!monthAnchorTime) {
-    monthAnchorTime = currentTime;
-    const month = await rollMonth(location, monthAnchorTime);
-    candidates = [...candidates.filter((c) => c.privateToUuid), ...month.candidates];
-    marketRolls = month.marketRolls;
-    changed = monthRolled = true;
-  } else if (currentTime - monthAnchorTime >= secondsPerMonth()) {
-    while (currentTime - monthAnchorTime >= secondsPerMonth()) monthAnchorTime += secondsPerMonth();
+  const calStart = calendarMonthStart(currentTime);
+  const rolledOver =
+    monthAnchorTime &&
+    (calStart != null ? monthAnchorTime < calStart : currentTime - monthAnchorTime >= secondsPerMonth());
+  if (!monthAnchorTime || rolledOver) {
+    // Long-running adverts: postings that already existed when the ending
+    // month began ran it in full — designate them; their searches ease one
+    // rarity for the whole location while the advert stays up.
+    if (rolledOver) {
+      for (const p of postings) {
+        if (p.status === "active" && !p.advertVeteran && (p.createdTime ?? Infinity) < monthAnchorTime) {
+          p.advertVeteran = true;
+          changed = true;
+        }
+      }
+    }
+    if (!monthAnchorTime) {
+      monthAnchorTime = calStart ?? currentTime;
+    } else if (calStart != null) {
+      monthAnchorTime = calStart;
+    } else {
+      while (currentTime - monthAnchorTime >= secondsPerMonth()) monthAnchorTime += secondsPerMonth();
+    }
     const month = await rollMonth(location, monthAnchorTime);
     candidates = [...candidates.filter((c) => c.privateToUuid), ...month.candidates];
     marketRolls = month.marketRolls;
@@ -519,7 +591,12 @@ export async function processLocation(location, currentTime = now()) {
     }
   }
 
-  // 2. Weekly fees per active posting (fee per week per type searched).
+  // Location-wide advert easings for this month's directed rolls (stamped
+  // veterans above; a closed advert stops easing).
+  const easedKeys = advertEasedKeys(postings);
+
+  // 2. Weekly fees per active posting (fee per week per type searched —
+  // each posting pays its own ROLLED fee every week it runs).
   for (const posting of postings) {
     if (posting.status !== "active") continue;
     const employerDoc = posting.employerUuid ? await fromUuid(posting.employerUuid).catch(() => null) : null;
@@ -533,12 +610,19 @@ export async function processLocation(location, currentTime = now()) {
       changed = true;
     }
 
-    // 3a. Private searches: monthly re-roll while the posting stays active.
-    // The fresh roll PURGES last month's rows (hired ones are actors now).
-    if (PRIVATE_KINDS.includes(posting.spec.kind) && currentTime - posting.monthStartTime >= secondsPerMonth()) {
+    // 3a. Private searches: monthly re-roll while the posting stays active
+    // (calendar months when the world runs a calendar). The fresh roll
+    // PURGES last month's rows (hired ones are actors now).
+    const privateDue =
+      calStart != null
+        ? posting.monthStartTime < calStart
+        : currentTime - posting.monthStartTime >= secondsPerMonth();
+    if (PRIVATE_KINDS.includes(posting.spec.kind) && privateDue) {
       candidates = candidates.filter((c) => c.privateToUuid !== posting.employerUuid);
       const mc = effectiveMarketClass(location, employer);
-      const spec = posting.spec.toObject?.() ?? posting.spec;
+      // Detached copy: the eased flag never writes back into the posting.
+      const spec = { ...(posting.spec.toObject?.() ?? posting.spec) };
+      if (easedKeys.has(specEaseKey(spec))) spec.advertEased = true;
       const result = await rollMonthlyPool(spec, mc, rollDice, Math.random, sys.classRarityTableId || "default");
       if (!result.error) {
         let total = result.quantity;
@@ -609,6 +693,17 @@ export async function closePosting(location, postingId, { requestUserId = null }
 registerSocketAction("closePosting", async ({ locationUuid, postingId, requestUserId }) => {
   const location = await fromUuid(locationUuid);
   if (location) await closePosting(location.actor ?? location, postingId, { requestUserId });
+});
+
+/** Player posting creation relays through the GM (players cannot write the
+ *  location actor); employer ownership + criteria are enforced in
+ *  createPosting against requestUserId. */
+registerSocketAction("createPosting", async ({ locationUuid, spec, employerUuid, playersSeeDetails, requestUserId }) => {
+  const locationDoc = await fromUuid(locationUuid);
+  const location = locationDoc?.actor ?? locationDoc;
+  const employerDoc = employerUuid ? await fromUuid(employerUuid).catch(() => null) : null;
+  if (!location) return;
+  await createPosting(location, spec, employerDoc?.actor ?? employerDoc, { playersSeeDetails, requestUserId });
 });
 
 /** Process every location actor in the world (GM-side time hook target). */

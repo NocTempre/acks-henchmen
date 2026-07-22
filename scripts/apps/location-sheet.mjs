@@ -1,4 +1,4 @@
-/* global game, ui, foundry, fromUuidSync */
+/* global game, ui, foundry, fromUuidSync, fromUuid, RollTable, TextEditor */
 /**
  * LocationSheet — ActorSheetV2 for the `acks-henchmen.location` sub-type.
  *
@@ -41,6 +41,7 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
       removeSlander: LocationSheet.#onRemoveSlander,
       addDemographic: LocationSheet.#onAddDemographic,
       removeDemographic: LocationSheet.#onRemoveDemographic,
+      exportDemographics: LocationSheet.#onExportDemographics,
     },
   };
 
@@ -255,6 +256,15 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     super._onRender(context, options);
     const root = this.element;
 
+    // Culture mix by drag-and-drop: drop a RollTable of cultures on the
+    // demographics block to SET this town's mix (result text = culture,
+    // weight = result weight/range width). The exported mix round-trips.
+    const demoBlock = root.querySelector(".demographics-block");
+    if (demoBlock && game.user.isGM) {
+      demoBlock.addEventListener("dragover", (ev) => ev.preventDefault());
+      demoBlock.addEventListener("drop", (ev) => this.#onDropDemographics(ev));
+    }
+
     const filterInput = root.querySelector("[data-candidate-filter]");
     if (filterInput) {
       filterInput.addEventListener("input", () => {
@@ -449,5 +459,72 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
       .map((d) => d.toObject?.() ?? d)
       .filter((_, i) => i !== index);
     await this.actor.update({ "system.demographics": demographics });
+  }
+
+  /** Drop a RollTable on the demographics block → set the culture mix. */
+  async #onDropDemographics(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    let dropData;
+    try {
+      const TE = foundry.applications?.ux?.TextEditor?.implementation ?? TextEditor;
+      dropData = TE.getDragEventData(event);
+    } catch {
+      return;
+    }
+    if (dropData?.type !== "RollTable") return;
+    const table = await fromUuid(dropData.uuid).catch(() => null);
+    if (!table) return;
+    const cultures = optTable("people", "cultures")?.list ?? {};
+    const byLabel = Object.fromEntries(
+      Object.entries(cultures).map(([id, c]) => [String(c.label ?? id).toLowerCase(), id])
+    );
+    const demographics = [];
+    const unknown = [];
+    for (const r of table.results) {
+      const text = String(r.description ?? r.text ?? "").trim();
+      const key = text.toLowerCase();
+      const culture = cultures[key] ? key : byLabel[key];
+      const [min, max] = r.range ?? [];
+      const weight = Number(r.weight) || (Number.isFinite(min) && Number.isFinite(max) ? max - min + 1 : 1);
+      if (!culture) {
+        unknown.push(text);
+        continue;
+      }
+      demographics.push({ culture, weight });
+    }
+    if (!demographics.length) {
+      ui.notifications.warn(game.i18n.format("ACKS-HENCHMEN.location.mixNoCultures", { name: table.name }));
+      return;
+    }
+    await this.actor.update({ "system.demographics": demographics });
+    ui.notifications.info(
+      game.i18n.format("ACKS-HENCHMEN.location.mixApplied", { name: table.name, n: demographics.length }) +
+        (unknown.length ? " " + game.i18n.format("ACKS-HENCHMEN.location.mixUnknown", { list: unknown.join(", ") }) : "")
+    );
+  }
+
+  /** Export the current culture mix as a prefilled world RollTable. */
+  static async #onExportDemographics() {
+    const cultures = optTable("people", "cultures")?.list ?? {};
+    const demographics = (this.actor.system.demographics ?? []).map((d) => d.toObject?.() ?? d);
+    const rows = demographics.length
+      ? demographics
+      : Object.keys(cultures).map((id) => ({ culture: id, weight: 1 }));
+    let at = 0;
+    const results = rows.map((d) => {
+      const w = Math.max(1, Number(d.weight) || 1);
+      const range = [at + 1, at + w];
+      at += w;
+      return { text: cultures[d.culture]?.label ?? d.culture, weight: w, range };
+    });
+    const table = await RollTable.create({
+      name: game.i18n.format("ACKS-HENCHMEN.location.mixTableName", { name: this.actor.name }),
+      formula: `1d${Math.max(1, at)}`,
+      description: game.i18n.localize("ACKS-HENCHMEN.location.mixTableHint"),
+      results,
+    });
+    ui.notifications.info(game.i18n.format("ACKS-HENCHMEN.location.mixExported", { name: table.name }));
+    table.sheet.render(true);
   }
 }

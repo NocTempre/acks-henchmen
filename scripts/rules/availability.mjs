@@ -124,6 +124,8 @@ export async function rollMonthlyPool(spec, marketClass, rollDice, rand = Math.r
       // harder (chaotic warlocks in a lawful town) — shift per the table.
       if (spec.alignmentShift) tier = tier ? shiftRarity(tier, spec.alignmentShift) : tier;
       if (spec.commissioned) tier = shiftRarity(tier, -1) ?? tier;
+      // A month-long advert for this class eases the whole location one step.
+      if (spec.advertEased && tier) tier = shiftRarity(tier, -1) ?? tier;
       if (!tier) return { error: "past-legendary" };
       const expr = rarityExpr(tier, mc);
       if (!expr) return { error: "unknown-rarity" };
@@ -136,7 +138,12 @@ export async function rollMonthlyPool(spec, marketClass, rollDice, rand = Math.r
       const map = optTable("rarity", "specificQualificationMods")?.generalProficiency?.ranksToRarity;
       if (!map) return { error: "tables-missing" };
       let tier = map[String(ranks)];
+      // JJ specific searches: +1 rarity per level above 1st — a leveled
+      // proficiency post shifts like a leveled class post.
+      if (spec.levelShift) tier = shiftRarity(tier, spec.levelShift) ?? null;
+      if (!tier) return { error: "past-legendary" };
       if (spec.commissioned) tier = shiftRarity(tier, -1) ?? tier;
+      if (spec.advertEased) tier = shiftRarity(tier, -1) ?? tier;
       const expr = rarityExpr(tier, mc);
       if (!expr) return { error: "unknown-rarity" };
       const rolled = await rollAvailability(expr, rollDice, rand);

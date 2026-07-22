@@ -54,6 +54,9 @@ function postingField() {
     }),
     commissioned: new fields.BooleanField({ initial: false }),
     renew: new fields.BooleanField({ initial: false }), // roll a fresh pool at month end
+    // Ran a whole market month unchanged: designated on the sheet (post
+    // color) and eases its search one rarity for the whole location.
+    advertVeteran: new fields.BooleanField({ initial: false }),
     // The level the employer PRESENTS as (RR 168: candidates judge by
     // appearance and spending — lying is possible; discovery = loyalty
     // roll at −1 per level of difference). null = honest.

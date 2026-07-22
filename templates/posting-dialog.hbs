@@ -12,15 +12,20 @@
   <div class="form-group">
     <label>{{localize "ACKS-HENCHMEN.posting.kindLabel"}}</label>
     <select name="kind" data-posting-kind>
+      {{#if isGM}}
       <option value="henchman">{{localize "ACKS-HENCHMEN.posting.kind.henchman"}}</option>
+      {{/if}}
       <option value="henchmanByClass">{{localize "ACKS-HENCHMEN.posting.kind.henchmanByClass"}}</option>
       <option value="henchmanByProficiency">{{localize "ACKS-HENCHMEN.posting.kind.henchmanByProficiency"}}</option>
       <option value="mercenary">{{localize "ACKS-HENCHMEN.posting.kind.mercenary"}}</option>
       <option value="specialist">{{localize "ACKS-HENCHMEN.posting.kind.specialist"}}</option>
     </select>
   </div>
+  {{#unless isGM}}
+  <p class="hint">{{localize "ACKS-HENCHMEN.posting.criteriaHint"}}</p>
+  {{/unless}}
 
-  <div class="form-group" data-kind-field="henchman henchmanByClass">
+  <div class="form-group" data-kind-field="henchman henchmanByClass henchmanByProficiency">
     <label>{{localize "ACKS-HENCHMEN.posting.level"}}</label>
     <select name="level">
       {{#each levels}}
@@ -28,7 +33,7 @@
       {{/each}}
     </select>
   </div>
-  <p class="hint" data-kind-field="henchmanByClass">{{localize "ACKS-HENCHMEN.posting.classLevelHint"}}</p>
+  <p class="hint" data-kind-field="henchmanByClass henchmanByProficiency">{{localize "ACKS-HENCHMEN.posting.classLevelHint"}}</p>
 
   <div class="form-group" data-kind-field="henchmanByClass">
     <label>{{localize "ACKS-HENCHMEN.posting.classKey"}}</label>

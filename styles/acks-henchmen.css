@@ -408,3 +408,12 @@
   padding: 0.1rem 0.3rem;
   border-top: 1px dotted var(--color-border-light-tertiary, #b5b3a4);
 }
+
+/* Long-running advert: the post "changes color" (RAW designation) — the
+   whole location's search for that thing eases one rarity while it runs. */
+.acks-henchmen.location-sheet tr.advert-veteran td:first-child {
+  color: var(--color-text-hyperlink, #1c60a5);
+}
+.acks-henchmen.location-sheet tr.advert-veteran .fa-bullhorn {
+  color: var(--color-text-hyperlink, #1c60a5);
+}
