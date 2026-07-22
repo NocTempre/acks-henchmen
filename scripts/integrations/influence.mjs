@@ -1,4 +1,4 @@
-/* global game, Hooks */
+/* global game, Hooks, foundry */
 /**
  * acks-influence integration (soft — everything is guarded).
  *
@@ -121,6 +121,9 @@ export function signingTierFromParts(parts) {
   return Number(entry?.value) || 0;
 }
 
+/** Recently applied roll resolutions (signature → ms) — see the dedupe below. */
+const _seenResolutions = new Map();
+
 export function registerInfluenceIntegration() {
   if (!game.modules.get(INFLUENCE_ID)?.active) return;
 
@@ -129,6 +132,15 @@ export function registerInfluenceIntegration() {
       const context = payload?.context;
       // --- Our hosted pages: apply the consequences ---
       if (context?.module === MODULE_ID) {
+        // One roll = one application. Multiple open dialog instances for the
+        // same candidate each report the shared completion (found live
+        // 2026-07-22: two stale hiring windows → two hires, two actors) —
+        // collapse identical resolutions reported within a short window.
+        const sig = [context.candidateId ?? context.specialHireId ?? context.actorUuid ?? "", payload.mode, payload.natural, payload.total, payload.outcome].join(":");
+        const nowMs = Date.now();
+        for (const [k, t] of _seenResolutions) if (nowMs - t > 15000) _seenResolutions.delete(k);
+        if (_seenResolutions.has(sig)) return;
+        _seenResolutions.set(sig, nowMs);
         if (payload.mode === "hiring") {
           const signingTier = signingTierFromParts(payload.parts);
           const signingGp = signingTier > 0 ? (context.signingTiers?.[signingTier] ?? 0) : 0;
@@ -139,6 +151,9 @@ export function registerInfluenceIntegration() {
             employerUuid: context.employerUuid,
             result: { outcome: payload.outcome, natural: payload.natural, total: payload.total, parts: payload.parts },
             signingGp,
+            // one id per ROLL: every GM socket that receives this delivery
+            // claims with the same id, so exactly one applies it
+            resolutionId: foundry.utils.randomID(),
           });
         } else if (payload.mode === "loyalty") {
           // Loyalty pages open on the GM client; apply directly there.

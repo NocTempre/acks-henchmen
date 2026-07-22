@@ -25,11 +25,17 @@ function hasBribery(employer) {
   );
 }
 
-/** Resolve which character is attempting the recruitment. */
+/** Resolve which character is attempting the recruitment. Players offer on
+ *  behalf of characters they OWN; GMs may pick any PC. */
 async function pickEmployer(preferred) {
   if (preferred) return preferred;
   if (game.user.character) return game.user.character;
-  const choices = game.actors.filter((a) => a.type === "character" && !a.system?.retainer?.enabled);
+  const choices = game.actors.filter(
+    (a) =>
+      a.type === "character" &&
+      !a.system?.retainer?.enabled &&
+      (game.user.isGM || a.testUserPermission(game.user, "OWNER"))
+  );
   if (!choices.length) return null;
   if (choices.length === 1) return choices[0];
   const options = choices.map((a) => `<option value="${a.id}">${a.name}</option>`).join("");
@@ -125,6 +131,7 @@ async function launchOffer({ location, employer, offer }) {
         employerUuid: employer.uuid,
         result: { outcome: result.outcome, natural: result.natural, total: result.total, parts: result.parts },
         signingGp,
+        resolutionId: foundry.utils.randomID(), // multi-GM-socket claim key
       });
     },
   });
@@ -193,19 +200,57 @@ export async function openRecruitSpecial(location, specialHireId, preferredEmplo
   });
 }
 
-/** GM-side executor for a resolved hiring throw (socket action + hook). */
+/** GM-side executor for a resolved hiring throw (socket action + hook).
+ *
+ *  EXACTLY-ONCE under duplicate delivery. The same resolution reaches every
+ *  socket of the addressed GM user (GM open in two windows, a co-GM) — found
+ *  live 2026-07-22 as two hires, two actors, 12ms apart. Defense in depth:
+ *  an in-flight key kills same-client duplicates, and a persisted CLAIM
+ *  settles cross-socket races: each roll carries a resolutionId; the applier
+ *  writes it on the candidate, waits a settle beat so every claimant's write
+ *  lands, re-reads, and only the socket whose id survived applies. */
+const inFlightOutcomes = new Set();
+const CLAIM_SETTLE_MS = 300;
+
+async function claimResolution(location, payload) {
+  const resolutionId = payload.resolutionId;
+  if (!resolutionId) return true; // legacy caller — apply unguarded
+  const read = () => {
+    const list = payload.candidateId ? location.system.candidates : location.system.specialHires;
+    const id = payload.candidateId ?? payload.specialHireId;
+    const entry = (list ?? []).find((e) => e.id === id);
+    return entry ? (entry.toObject?.() ?? entry) : null;
+  };
+  const entry = read();
+  if (!entry) return false;
+  if (entry.lastResolutionId === resolutionId) return false; // replay of an applied roll
+  const write = { lastResolutionId: resolutionId };
+  if (payload.candidateId) await updateCandidate(location, payload.candidateId, write);
+  else await updateSpecialHire(location, payload.specialHireId, write);
+  await new Promise((r) => setTimeout(r, CLAIM_SETTLE_MS));
+  return read()?.lastResolutionId === resolutionId; // last claim wins; losers abort
+}
+
 export async function handleHiringOutcomePayload(payload) {
-  const location = await fromUuid(payload.locationUuid);
-  const employer = await fromUuid(payload.employerUuid);
-  if (!location || !employer) return;
-  await handleOutcome({
-    location,
-    candidateId: payload.candidateId,
-    specialHireId: payload.specialHireId,
-    employer: employer.actor ?? employer,
-    result: payload.result,
-    signingGp: payload.signingGp,
-  });
+  const key = `${payload.locationUuid}:${payload.candidateId ?? payload.specialHireId ?? ""}`;
+  if (inFlightOutcomes.has(key)) return;
+  inFlightOutcomes.add(key);
+  try {
+    const location = await fromUuid(payload.locationUuid);
+    const employer = await fromUuid(payload.employerUuid);
+    if (!location || !employer) return;
+    if (!(await claimResolution(location.actor ?? location, payload))) return;
+    await handleOutcome({
+      location,
+      candidateId: payload.candidateId,
+      specialHireId: payload.specialHireId,
+      employer: employer.actor ?? employer,
+      result: payload.result,
+      signingGp: payload.signingGp,
+    });
+  } finally {
+    inFlightOutcomes.delete(key);
+  }
 }
 
 registerSocketAction("hiringOutcome", handleHiringOutcomePayload);

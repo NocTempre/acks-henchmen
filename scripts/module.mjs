@@ -1,4 +1,4 @@
-/* global game, foundry, Hooks, CONFIG, Actor, ui */
+/* global game, foundry, Hooks, CONFIG, Actor, ui, CONST */
 /**
  * ACKS II — Henchmen & Hirelings. Entry point.
  *
@@ -231,6 +231,15 @@ Hooks.once("ready", () => {
   } catch (err) {
     console.warn(`${MODULE_ID} | chat command registration failed`, err);
   }
+});
+
+/* A location is a public bulletin board: new location actors default to
+ * OBSERVER so players can open the sheet, post searches, and recruit
+ * without the GM hand-editing permissions (explicit ownership wins). */
+Hooks.on("preCreateActor", (doc, data) => {
+  if (doc.type !== `${MODULE_ID}.location`) return;
+  if (data?.ownership?.default != null) return;
+  doc.updateSource({ "ownership.default": CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER });
 });
 
 /* Bind event-card buttons (v14 AppV2 convention: HTMLElement hook only —

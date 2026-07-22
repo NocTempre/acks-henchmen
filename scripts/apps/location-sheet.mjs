@@ -171,11 +171,18 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     const ownedUuids = game.user.isGM
       ? []
       : game.actors.filter((a) => a.testUserPermission(game.user, "OWNER")).map((a) => a.uuid);
-    const coveredSegments = new Set(
-      postings
-        .filter((p) => p.status === "active" && p.segment && (game.user.isGM || ownedUuids.includes(p.employerUuid)))
-        .map((p) => p.segment)
-    );
+    // A posting covers its shared segment; a DIRECTED leveled post (the only
+    // henchman post players can make) also covers the shared henchman pool at
+    // its level — the recruiter is interviewing at that level, so the town's
+    // walk-ins of that level respond to the advert too.
+    const coveredSegments = new Set();
+    for (const p of postings) {
+      if (p.status !== "active") continue;
+      if (!(game.user.isGM || ownedUuids.includes(p.employerUuid))) continue;
+      if (p.segment) coveredSegments.add(p.segment);
+      const spec = p.spec ?? {};
+      if (!p.segment && spec.level != null && spec.level >= 0) coveredSegments.add(`henchman:${spec.level}`);
+    }
     const maskedSegments = new Set(
       postings.filter((p) => p.segment && p.playersSeeDetails === false).map((p) => p.segment)
     );

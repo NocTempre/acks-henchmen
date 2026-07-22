@@ -98,6 +98,10 @@ function candidateField() {
     appearance: str(),
     hitDice: str(), // 0th-level HD line (JJ 252), e.g. "1/2 HD (1d4 hp)"
     profCount: num({ integer: true }), // JJ 253 general-proficiency count by age
+    // Claim token: the socket that applies a hiring-roll resolution claims it
+    // here first, so the same resolution delivered to several GM sockets
+    // (GM in two windows, co-GM) applies exactly once.
+    lastResolutionId: str(),
     kind: new fields.StringField({ required: true, initial: "henchman" }),
     quantity: int(1), // >1 only for aggregated troop-scale rows
     level: num({ integer: true }),
@@ -242,6 +246,7 @@ export class LocationData extends foundry.abstract.TypeDataModel {
               result: str(),
             })
           ),
+          lastResolutionId: str(), // multi-GM-socket claim (see candidateField)
           notes: str(),
         })
       ),

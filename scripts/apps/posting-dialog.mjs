@@ -40,12 +40,14 @@ export class PostingDialog extends HandlebarsApplicationMixin(ApplicationV2) {
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
     context.isGM = game.user.isGM;
+    // Players post on behalf of characters they OWN; GMs see every PC.
+    const mayUse = (a) => game.user.isGM || a.testUserPermission(game.user, "OWNER");
     context.employers = game.actors
-      .filter((a) => a.type === "character" && a.hasPlayerOwner && !a.system?.retainer?.enabled)
+      .filter((a) => a.type === "character" && a.hasPlayerOwner && !a.system?.retainer?.enabled && mayUse(a))
       .map((a) => ({ id: a.id, name: a.name, level: adapter.getLevel(a) }));
     if (!context.employers.length) {
       context.employers = game.actors
-        .filter((a) => a.type === "character" && !a.system?.retainer?.enabled)
+        .filter((a) => a.type === "character" && !a.system?.retainer?.enabled && mayUse(a))
         .map((a) => ({ id: a.id, name: a.name, level: adapter.getLevel(a) }));
     }
     context.levels = [0, 1, 2, 3, 4].map((l) => ({ level: l }));
