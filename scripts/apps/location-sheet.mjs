@@ -49,6 +49,22 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     body: { template: `modules/${MODULE_ID}/templates/location-sheet.hbs` },
   };
 
+  /** Sheet tabs (user direction 2026-07-22: tabs, not one long page). */
+  static TABS = {
+    primary: {
+      tabs: [
+        { id: "recruitment", icon: "fas fa-scroll" },
+        { id: "henchmen", icon: "fas fa-user-group" },
+        { id: "mercenaries", icon: "fas fa-shield-halved" },
+        { id: "specialists", icon: "fas fa-user-gear" },
+        { id: "gmSettings", icon: "fas fa-gears" },
+        { id: "gmView", icon: "fas fa-eye" },
+      ],
+      initial: "recruitment",
+      labelPrefix: "ACKS-HENCHMEN.location.tab",
+    },
+  };
+
   /** Localized label for a shared-pool segment key. */
   #segmentLabel(segment) {
     const [kind, key] = String(segment ?? "").split(":");
@@ -243,6 +259,23 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     context.slander = (sys.slander ?? []).map((s, index) => ({ ...(s.toObject?.() ?? s), index }));
     context.ledger = (sys.searchLedger ?? []).slice(-20).reverse();
     context.ledgerTotal = (sys.searchLedger ?? []).reduce((s, l) => s + l.gp, 0);
+
+    // Tabs: labels carry live counts; the GM tabs exist only for GMs.
+    context.tabs = this._prepareTabs("primary");
+    if (!game.user.isGM) {
+      delete context.tabs.gmSettings;
+      delete context.tabs.gmView;
+    }
+    const tabCounts = {
+      recruitment: context.postings.filter((p) => p.isActive).length + context.directedRows.length + (context.specialHires?.length ?? 0),
+      henchmen: context.henchmenRows.length,
+      mercenaries: context.mercenaryRows.length,
+      specialists: context.specialistRows.length,
+    };
+    for (const [id, tab] of Object.entries(context.tabs)) {
+      const base = game.i18n.localize(`ACKS-HENCHMEN.location.tab.${id}`);
+      tab.label = tabCounts[id] != null ? `${base} (${tabCounts[id]})` : base;
+    }
     return context;
   }
 
@@ -265,15 +298,16 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
       demoBlock.addEventListener("drop", (ev) => this.#onDropDemographics(ev));
     }
 
-    const filterInput = root.querySelector("[data-candidate-filter]");
-    if (filterInput) {
+    // One filter per candidate tab, scoped to its own tables.
+    root.querySelectorAll("[data-candidate-filter]").forEach((filterInput) => {
+      const scope = filterInput.closest(".tab") ?? root;
       filterInput.addEventListener("input", () => {
         const needle = filterInput.value.trim().toLowerCase();
-        root.querySelectorAll(".candidates-table tbody tr").forEach((tr) => {
+        scope.querySelectorAll(".candidates-table tbody tr").forEach((tr) => {
           tr.style.display = !needle || tr.textContent.toLowerCase().includes(needle) ? "" : "none";
         });
       });
-    }
+    });
 
     root.querySelectorAll(".candidates-table th[data-sortable]").forEach((th) => {
       th.addEventListener("click", () => {

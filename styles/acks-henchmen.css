@@ -417,3 +417,34 @@
 .acks-henchmen.location-sheet tr.advert-veteran .fa-bullhorn {
   color: var(--color-text-hyperlink, #1c60a5);
 }
+
+/* Location sheet tabs (Recruitment / Henchmen / Mercs / Specialists / GM) */
+.acks-henchmen.location-sheet nav.sheet-tabs {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+  border-bottom: 2px solid var(--color-border-light-primary, #782e22);
+  margin: 0.35rem 0 0.5rem 0;
+  padding-bottom: 0;
+}
+.acks-henchmen.location-sheet nav.sheet-tabs a {
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--color-border-light-tertiary, #b5b3a4);
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  background: rgba(0, 0, 0, 0.04);
+  font-size: var(--font-size-13, 13px);
+  white-space: nowrap;
+}
+.acks-henchmen.location-sheet nav.sheet-tabs a.active {
+  background: var(--color-border-light-primary, #782e22);
+  color: #fff;
+  font-weight: bold;
+}
+.acks-henchmen.location-sheet section.location-tab:not(.active) {
+  display: none;
+}
+.acks-henchmen.location-sheet section.location-tab {
+  overflow-y: auto;
+  flex: 1;
+}
