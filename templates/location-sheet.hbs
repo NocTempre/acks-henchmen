@@ -366,7 +366,12 @@
       <p class="hint">{{localize "ACKS-HENCHMEN.location.slanderHint"}}</p>
       {{#each slander}}
       <div class="slander-row" data-slander-index="{{index}}">
-        <input type="text" name="system.slander.{{index}}.partyKey" value="{{partyKey}}" placeholder="{{localize 'ACKS-HENCHMEN.location.slanderParty'}}" />
+        <select name="system.slander.{{index}}.subject.scope">
+          <option value="all" {{#if (eq subject.scope "all")}}selected{{/if}}>{{localize "ACKS-HENCHMEN.location.slanderScopeAll"}}</option>
+          <option value="party" {{#if (eq subject.scope "party")}}selected{{/if}}>{{localize "ACKS-HENCHMEN.location.slanderScopeParty"}}</option>
+          <option value="character" {{#if (eq subject.scope "character")}}selected{{/if}}>{{localize "ACKS-HENCHMEN.location.slanderScopeCharacter"}}</option>
+        </select>
+        <input type="text" name="system.slander.{{index}}.subject.uuid" value="{{subject.uuid}}" placeholder="{{localize 'ACKS-HENCHMEN.location.slanderSubjectUuid'}}" />
         <input type="text" name="system.slander.{{index}}.npcName" value="{{npcName}}" placeholder="{{localize 'ACKS-HENCHMEN.location.slanderNpc'}}" />
         <input type="text" name="system.slander.{{index}}.note" value="{{note}}" placeholder="{{localize 'ACKS-HENCHMEN.location.slanderNote'}}" />
         <a data-action="removeSlander"><i class="fas fa-trash"></i></a>

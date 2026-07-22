@@ -1,4 +1,4 @@
-/* global game, ui, foundry, fromUuidSync, fromUuid, RollTable, TextEditor */
+/* global game, ui, foundry, fromUuidSync, fromUuid, RollTable, TextEditor, Hooks */
 /**
  * LocationSheet — ActorSheetV2 for the `acks-henchmen.location` sub-type.
  *
@@ -8,7 +8,7 @@
  * fee ledger. Players with OBSERVER permission see the candidates their
  * paid searches cover; GMs see everything.
  */
-import { MODULE_ID, SECONDS_PER_DAY, SECONDS_PER_WEEK } from "../constants.mjs";
+import { MODULE_ID, HOOKS, SECONDS_PER_DAY, SECONDS_PER_WEEK } from "../constants.mjs";
 import { getTable, optTable } from "../rules/tables.mjs";
 import { processLocation, closePosting } from "../engine/recruitment.mjs";
 import { executeAsGM } from "../sockets.mjs";
@@ -468,15 +468,17 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
   static async #onAddSlander() {
     const slander = [
       ...(this.actor.system.slander ?? []).map((s) => s.toObject?.() ?? s),
-      { partyKey: "", npcName: "", time: now(), note: "" },
+      { subject: { scope: "all", uuid: "" }, npcName: "", time: now(), note: "" },
     ];
     await this.actor.update({ "system.slander": slander });
+    Hooks.callAll(HOOKS.SLANDER_CHANGED, { location: this.actor });
   }
 
   static async #onRemoveSlander(_event, target) {
     const index = Number(target.closest("[data-slander-index]")?.dataset.slanderIndex);
     const slander = (this.actor.system.slander ?? []).map((s) => s.toObject?.() ?? s).filter((_, i) => i !== index);
     await this.actor.update({ "system.slander": slander });
+    Hooks.callAll(HOOKS.SLANDER_CHANGED, { location: this.actor });
   }
 
   static async #onAddDemographic() {

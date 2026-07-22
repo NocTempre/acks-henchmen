@@ -120,6 +120,13 @@ Hooks.once("setup", async () => {
     validateMonsterRecruit,
     openFollowersDialog,
     openInfluenceFor,
+    // "Where am I slandered?" — the party/character-side reader over the
+    // location-held slander registries (a read helper, not a second store).
+    slanderedAt: (query = {}) =>
+      game.actors
+        .filter((a) => a.type === LOCATION_TYPE)
+        .map((location) => ({ location, count: location.system.slanderCountFor?.(query) ?? 0 }))
+        .filter((r) => r.count > 0),
     integrations: { influence: influenceIntegration },
     facts,
     // engine

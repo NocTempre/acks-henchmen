@@ -194,7 +194,7 @@ export function openInfluenceFor(employer, location = null, targetActor = null) 
   const api = influenceApi();
   if (!api) return null;
   const modifiers = [];
-  const slanderCount = location?.system?.slanderCountFor?.(employer?.uuid) ?? 0;
+  const slanderCount = location?.system?.slanderCountFor?.({ employerUuid: employer?.uuid }) ?? 0;
   if (slanderCount > 0) {
     modifiers.push({
       label: game.i18n.format("ACKS-HENCHMEN.influence.slanderLabel", { name: location.name }),

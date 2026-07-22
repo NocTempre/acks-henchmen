@@ -75,6 +75,7 @@ export const HOOKS = Object.freeze({
   WAGES_PAID: `${MODULE_ID}.wagesPaid`,
   WAGES_MISSED: `${MODULE_ID}.wagesMissed`,
   ROSTER_CHANGED: `${MODULE_ID}.rosterChanged`,
+  SLANDER_CHANGED: `${MODULE_ID}.slanderChanged`,
 });
 
 /** Seconds per day/week for worldTime math (month length is a setting). */

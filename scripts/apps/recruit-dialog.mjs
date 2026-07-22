@@ -66,7 +66,7 @@ function signingSetup(employer, wage) {
 /** Shared launcher for candidates and special hires. */
 async function launchOffer({ location, employer, offer }) {
   const signing = signingSetup(employer, offer.wage);
-  const slanderCount = location.system.slanderCountFor?.(employer.uuid) ?? 0;
+  const slanderCount = location.system.slanderCountFor?.({ employerUuid: employer.uuid }) ?? 0;
 
   if (hostsModes()) {
     openHiringViaInfluence({
@@ -266,13 +266,14 @@ async function handleOutcome({ location, candidateId, specialHireId, employer, r
       const slander = [
         ...(location.system.slander ?? []).map((s) => s.toObject?.() ?? s),
         {
-          partyKey: employer.uuid,
+          subject: { scope: "party", uuid: employer.uuid },
           npcName,
           time: now(),
           note: game.i18n.localize("ACKS-HENCHMEN.recruit.slanderNote"),
         },
       ];
       await location.update({ "system.slander": slander });
+      Hooks.callAll(HOOKS.SLANDER_CHANGED, { location, subject: { scope: "party", uuid: employer.uuid } });
       break;
     }
   }

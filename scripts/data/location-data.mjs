@@ -247,7 +247,17 @@ export class LocationData extends foundry.abstract.TypeDataModel {
       ),
       slander: new fields.ArrayField(
         new fields.SchemaField({
-          partyKey: str(), // employer uuid or party label the penalty applies to
+          // WHO the −1 applies to. One location-held entry can name a party
+          // (employer uuid) or an individual character, so a subject is counted
+          // once and never double-tallied across a party and its members.
+          subject: new fields.SchemaField({
+            scope: new fields.StringField({
+              required: true,
+              initial: "all",
+              choices: ["all", "party", "character"],
+            }),
+            uuid: str(), // employer/party actor uuid, or character uuid; "" when scope="all"
+          }),
           npcName: str(),
           time: int(),
           note: str(),
@@ -262,6 +272,26 @@ export class LocationData extends foundry.abstract.TypeDataModel {
         })
       ),
     };
+  }
+
+  /**
+   * Legacy → subject migration: the flat `partyKey` string became a structured
+   * `subject {scope, uuid}`. A blank key meant "applies to everyone"; any other
+   * value was an employer/party uuid. Runs before validation on load.
+   */
+  static migrateData(source) {
+    if (Array.isArray(source?.slander)) {
+      for (const entry of source.slander) {
+        if (entry && entry.subject === undefined && entry.partyKey !== undefined) {
+          entry.subject =
+            entry.partyKey === ""
+              ? { scope: "all", uuid: "" }
+              : { scope: "party", uuid: entry.partyKey };
+          delete entry.partyKey;
+        }
+      }
+    }
+    return super.migrateData(source);
   }
 
   /** Effective market class 1..6 (1 = largest), before per-actor effect shifts. */
@@ -289,8 +319,23 @@ export class LocationData extends foundry.abstract.TypeDataModel {
     return 4;
   }
 
-  /** Count of active refuse-and-slander entries against one party/employer. */
-  slanderCountFor(partyKey) {
-    return (this.slander ?? []).filter((s) => !partyKey || s.partyKey === partyKey || s.partyKey === "").length;
+  /**
+   * Count of active refuse-and-slander entries that apply to a recruiting
+   * subject. Accepts `{ employerUuid, characterUuid }`; a bare string is treated
+   * as `employerUuid` (back-compat shim for one release). Each entry matches at
+   * most one scope branch, so it is counted exactly once — the property that
+   * lets a party-wide and an individual slander coexist without double counting.
+   */
+  slanderCountFor(query) {
+    const { employerUuid = "", characterUuid = "" } =
+      typeof query === "string" ? { employerUuid: query } : (query ?? {});
+    return (this.slander ?? []).filter((s) => {
+      const scope = s.subject?.scope ?? "all";
+      const uuid = s.subject?.uuid ?? "";
+      if (scope === "all") return true;
+      if (scope === "party") return !!employerUuid && uuid === employerUuid;
+      if (scope === "character") return !!characterUuid && uuid === characterUuid;
+      return false;
+    }).length;
   }
 }
