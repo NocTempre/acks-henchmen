@@ -6,6 +6,24 @@
 import { MODULE_ID, HOOKS, FLAG_RECORD } from "../constants.mjs";
 import { henchmanWage } from "../rules/wages.mjs";
 import { optTable } from "../rules/tables.mjs";
+
+/** Availability specialist ids → harvested package labels (JJ 254-257). */
+const SPECIALIST_PACKAGE_KEYS = Object.freeze({
+  alchemist: ["alchemist"],
+  animalTrainerCommon: ["animaltrainer (domestic)"],
+  animalTrainerWild: ["animaltrainer (wild)"],
+  animalTrainerGiant: ["animaltrainer (giant)"],
+  animalTrainerFantastic: ["animaltrainer (fantastic)"],
+  armorer: ["armorer"],
+  engineer: ["engineer"],
+  healer: ["healer"],
+  healerPhysicker: ["healer (physicker)"],
+  healerChirurgeon: ["healer (chirugeon)", "healer (chirurgeon)"],
+  marinerNavigator: ["navigator"],
+  marinerCaptain: ["shipcaptain", "ship captain"],
+  sage: ["sage"],
+  lawyer: ["lawyer"],
+});
 import { startingLoyalty, effectiveLoyalty } from "../rules/loyalty.mjs";
 import { rollAttributes } from "../rules/candidates.mjs";
 import { sumEffectModifiers, hasEffectFlag } from "../effects.mjs";
@@ -278,15 +296,19 @@ export async function hire(location, candidateId, employer, opts = {}) {
   }
   const actor = await Actor.create(actorData);
 
-  // Grant the candidate's occupation proficiency package (JJ 254-257) as
-  // real ability items via the lib `ability-provider` contract — the items'
-  // effects then feed hiring/loyalty/obedience rolls automatically. Missing
-  // provider or tables degrades to no grants, never an error.
+  // Grant the candidate's proficiency package (JJ 254-257) as real ability
+  // items via the lib `ability-provider` contract — the items' effects then
+  // feed hiring/loyalty/obedience rolls automatically. 0th henchmen key by
+  // occupation; specialists map their availability type onto the package
+  // labels as printed (naming glue, code by rule — incl. the book's own
+  // "chirugeon" spelling). Missing provider or tables degrades to no grants.
   try {
     const provider = globalThis.acksLib?.services?.get?.("ability-provider");
-    const pack = candidate.occupation
-      ? optTable("people", "occupationPackages")?.[String(candidate.occupation).toLowerCase()]
-      : null;
+    const packs = optTable("people", "occupationPackages");
+    const keys = candidate.occupation
+      ? [String(candidate.occupation).toLowerCase()]
+      : (SPECIALIST_PACKAGE_KEYS[candidate.specialistType] ?? []);
+    const pack = packs ? keys.map((k) => packs[k]).find(Boolean) : null;
     if (provider && pack?.length) {
       const { items, missing } = await provider.resolve(pack);
       if (items.length) await actor.createEmbeddedDocuments("Item", items);
