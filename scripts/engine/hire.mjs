@@ -5,6 +5,7 @@
  */
 import { MODULE_ID, HOOKS, FLAG_RECORD } from "../constants.mjs";
 import { henchmanWage } from "../rules/wages.mjs";
+import { optTable } from "../rules/tables.mjs";
 import { startingLoyalty, effectiveLoyalty } from "../rules/loyalty.mjs";
 import { rollAttributes } from "../rules/candidates.mjs";
 import { sumEffectModifiers, hasEffectFlag } from "../effects.mjs";
@@ -276,6 +277,24 @@ export async function hire(location, candidateId, employer, opts = {}) {
     };
   }
   const actor = await Actor.create(actorData);
+
+  // Grant the candidate's occupation proficiency package (JJ 254-257) as
+  // real ability items via the lib `ability-provider` contract — the items'
+  // effects then feed hiring/loyalty/obedience rolls automatically. Missing
+  // provider or tables degrades to no grants, never an error.
+  try {
+    const provider = globalThis.acksLib?.services?.get?.("ability-provider");
+    const pack = candidate.occupation
+      ? optTable("people", "occupationPackages")?.[String(candidate.occupation).toLowerCase()]
+      : null;
+    if (provider && pack?.length) {
+      const { items, missing } = await provider.resolve(pack);
+      if (items.length) await actor.createEmbeddedDocuments("Item", items);
+      if (missing.length) console.warn(`${MODULE_ID} | unresolved proficiencies for ${actor.name}: ${missing.join(", ")}`);
+    }
+  } catch (err) {
+    console.error(`${MODULE_ID} | proficiency grant failed for ${actor.name}`, err);
+  }
 
   // 2. Core roster (reuse, not reimplement).
   try {

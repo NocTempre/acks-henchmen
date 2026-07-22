@@ -135,7 +135,16 @@ export function generateAge(rand, level, classKey) {
  */
 export function generateOccupation(rand, race = "human") {
   const table = optTable("people", "occupations");
-  if (!table) return { category: "", occupation: "" };
+  if (!table) {
+    // The category table (JJ 252) is not imported yet; draw uniformly from
+    // the harvested occupation packages so 0th candidates still get a trade
+    // and a proficiency grant. Category WEIGHTS arrive with that table.
+    const packs = optTable("people", "occupationPackages");
+    const keys = packs ? Object.keys(packs) : [];
+    if (!keys.length) return { category: "", occupation: "" };
+    const k = keys[Math.floor(rand() * keys.length)];
+    return { category: "", occupation: k.replace(/\b\w/g, (c) => c.toUpperCase()) };
+  }
   const raceTable = table.byRace?.[race];
   if (raceTable) {
     const category = pickWeighted(rand, raceTable.categories, (c) => c.weight);
