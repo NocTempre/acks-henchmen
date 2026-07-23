@@ -21,21 +21,56 @@ function pickWeighted(rand, entries, weightOf) {
   return entries[entries.length - 1];
 }
 
-/** Registry entry for a class ({bucket, rarity, race?, cultures?, sex?}). */
+/**
+ * Registry entry for a class ({bucket, rarity, race?, cultures?, sex?,
+ * alignment?}). DERIVED, not a shipped table: bucket comes from the
+ * imported class distribution, rarity from the imported rarity ladder,
+ * race from the class key's own adjective, and the RESTRICTIONS from the
+ * imported `people.classRestrictions` blocks (RR class descriptions). A
+ * world-imported `people.classRegistry` still wins if one exists.
+ */
 export function classInfo(classKey) {
-  const registry = optTable("people", "classRegistry")?.classes;
-  return registry?.[String(classKey ?? "").toLowerCase().trim()] ?? null;
+  const key = String(classKey ?? "").toLowerCase().trim();
+  if (!key) return null;
+  const imported = optTable("people", "classRegistry")?.classes?.[key];
+  if (imported) return imported;
+
+  const entry = {};
+  const buckets = optTable("rarity", "classDistribution")?.buckets ?? [];
+  for (const b of buckets) {
+    if ((b.rows ?? []).some((r) => String(r.class ?? "").toLowerCase() === key)) {
+      entry.bucket = b.id;
+      break;
+    }
+  }
+  const tiers = optTable("rarity", "classRarityTables")?.variants?.default?.tiers ?? {};
+  for (const [tier, list] of Object.entries(tiers)) {
+    if ((list ?? []).some((c) => String(c).toLowerCase() === key)) {
+      entry.rarity = tier;
+      break;
+    }
+  }
+  // Race from the key's own adjective — computed inline, NOT via
+  // raceForClass(): that reads classInfo and would recurse forever.
+  const race = raceFromClassKey(key);
+  if (race) entry.race = race;
+  Object.assign(entry, optTable("people", "classRestrictions")?.classes?.[key] ?? {});
+  return Object.keys(entry).length ? entry : null;
 }
 
-/** The race a class belongs to ("human" when the registry declares none). */
-export function raceForClass(classKey) {
-  const declared = classInfo(classKey)?.race;
-  if (declared) return declared;
-  // Until the class registry is importable, the race-bound classes announce
-  // their race in their own key ("elven spellsword", "dwarven vaultguard") —
-  // derive it so cultures align (no Zaharan humans, no elven vaultguards).
+/**
+ * Race announced by a class KEY's own adjective ("elven spellsword" → elf),
+ * or null for unmarked (human) classes. Pure string work — classInfo builds
+ * on this, so it must never read the registry back.
+ */
+export function raceFromClassKey(classKey) {
   const m = String(classKey ?? "").toLowerCase().match(/^(elven|dwarven|zaharan|nobiran|thrassian)\b/);
-  return m ? { elven: "elf", dwarven: "dwarf", zaharan: "zaharan", nobiran: "nobiran", thrassian: "thrassian" }[m[1]] : "human";
+  return m ? { elven: "elf", dwarven: "dwarf", zaharan: "zaharan", nobiran: "nobiran", thrassian: "thrassian" }[m[1]] : null;
+}
+
+/** The race a class belongs to ("human" when nothing declares otherwise). */
+export function raceForClass(classKey) {
+  return classInfo(classKey)?.race ?? raceFromClassKey(classKey) ?? "human";
 }
 
 /** Optional per-class culture whitelist (barbarians, shamans…). */
