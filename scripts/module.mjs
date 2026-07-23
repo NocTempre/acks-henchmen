@@ -94,6 +94,17 @@ Hooks.once("setup", async () => {
     } catch (err) {
       console.error(`${MODULE_ID} | failed to register throws automation`, err);
     }
+    // Declare the tables this module reads, so the materialize flow can
+    // generate EMPTY placeholders for expected-but-missing ones.
+    try {
+      globalThis.acksLib.tables.expectTables?.("availability", ["henchmanAvailability", "mercenaryAvailability", "specialistAvailability", "searchFees"]);
+      globalThis.acksLib.tables.expectTables?.("rarity", ["classRarityTables", "rarityAvailability", "randomHenchmanLevel", "classDistribution", "specificQualificationMods"]);
+      globalThis.acksLib.tables.expectTables?.("wages", ["henchmanWageByLevel", "signingBonus", "mercenaryWages"]);
+      globalThis.acksLib.tables.expectTables?.("people", ["cultures", "classPercentages", "occupationTypes", "occupationSubTables", "occupationPackages", "ageByClass", "proficienciesByAge", "hd0", "dwarvenCastes"]);
+      globalThis.acksLib.tables.expectTables?.("slavery", ["commonSlaves", "slaveTroopCosts", "soldierRules"]);
+    } catch (err) {
+      console.warn(`${MODULE_ID} | expectTables failed`, err);
+    }
   }
 
   // Public API: macros and other modules reach the module through here.

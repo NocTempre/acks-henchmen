@@ -134,9 +134,10 @@ export async function rollMonthlyPool(spec, marketClass, rollDice, rand = Math.r
     case "henchmanByProficiency": {
       // GENERAL proficiency search: rarity from the ranks ladder (JJ 119).
       const ranks = Math.min(3, Math.max(1, spec.proficiencyRanks ?? 1));
-      const map = optTable("rarity", "specificQualificationMods")?.generalProficiency?.ranksToRarity;
+      const sqm = optTable("rarity", "specificQualificationMods");
+      const map = sqm ? { 1: sqm.gpRank1, 2: sqm.gpRank2, 3: sqm.gpRank3 } : null;
       if (!map) return { error: "tables-missing" };
-      let tier = map[String(ranks)];
+      let tier = map[ranks];
       if (!tier) return { error: "past-legendary" };
       if (spec.commissioned) tier = shiftRarity(tier, -1) ?? tier;
       const expr = rarityExpr(tier, mc);
@@ -149,9 +150,11 @@ export async function rollMonthlyPool(spec, marketClass, rollDice, rand = Math.r
       // recruiter names, shifted per additional rank (JJ 119).
       let tier = classRarity(spec.classKey, rarityVariant);
       if (!tier) return { error: "unknown-class" };
+      // JJ 119: "equal to the base class, plus one for EACH rank" — rank 1
+      // already shifts (a Common class's rank-1 class prof is Uncommon).
       const ranks = Math.min(3, Math.max(1, spec.proficiencyRanks ?? 1));
-      const perRank = optTable("rarity", "specificQualificationMods")?.classProficiency?.perRank ?? 1;
-      if (ranks > 1) tier = shiftRarity(tier, (ranks - 1) * perRank);
+      const perRank = optTable("rarity", "specificQualificationMods")?.cpPerRank ?? 1;
+      tier = shiftRarity(tier, ranks * perRank);
       if (spec.alignmentShift) tier = tier ? shiftRarity(tier, spec.alignmentShift) : tier;
       if (spec.commissioned && tier) tier = shiftRarity(tier, -1) ?? tier;
       if (!tier) return { error: "past-legendary" };

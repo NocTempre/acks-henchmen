@@ -126,7 +126,7 @@ export function marketLogAppend(list, time, type, note) {
  * highlighted for the posting employer and stay available ALL month (no
  * weekly churn). Mutates `candidates` in place; returns the replaced count.
  */
-function applyDirectedReplacement({ location, spec, employerUuid, quantity, rarity, candidates }) {
+export function applyDirectedReplacement({ location, spec, employerUuid, quantity, rarity, candidates }) {
   if (!(quantity > 0)) return 0;
   const eligible = candidates.filter(
     (c) =>
