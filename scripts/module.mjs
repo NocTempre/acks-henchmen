@@ -102,7 +102,7 @@ Hooks.once("setup", async () => {
       globalThis.acksLib.tables.expectTables?.("rarity", ["classRarityTables", "rarityAvailability", "randomHenchmanLevel", "classDistribution", "specificQualificationMods"]);
       globalThis.acksLib.tables.expectTables?.("wages", ["henchmanWageByLevel", "signingBonus", "mercenaryWages"]);
       globalThis.acksLib.tables.expectTables?.("people", ["cultures", "classPercentages", "occupationTypes", "occupationSubTables", "occupationPackages", "classRestrictions", "cultureAppearance", "ageByClass", "proficienciesByAge", "hd0", "dwarvenCastes"]);
-      globalThis.acksLib.tables.expectTables?.("slavery", ["commonSlaves", "slaveTroopCosts", "soldierRules"]);
+      globalThis.acksLib.tables.expectTables?.("slavery", ["commonSlaves", "slaveTroopCosts", "slaveLoyalty", "soldierRules"]);
       globalThis.acksLib.tables.expectTables?.("settlement", ["marketClassByFamilies"]);
     } catch (err) {
       console.warn(`${MODULE_ID} | expectTables failed`, err);

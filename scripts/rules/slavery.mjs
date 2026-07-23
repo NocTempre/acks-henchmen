@@ -90,10 +90,26 @@ export function indoctrinationRules() {
 }
 
 /**
- * Loyalty presets for how a slave entered servitude live on JJ 411 (adults
- * vs. childhood indoctrination, liberation) — not yet extracted; returns
- * null rather than a stand-in. Never hardcode a book value here.
+ * Loyalty for how a slave entered servitude (JJ ~410, imported prose):
+ * enslaved as an adult carries the book's penalty; enslaved as a child and
+ * still serving the trainer carries its bonus. Null until imported —
+ * never a hardcoded stand-in.
+ * @param {object} o - { enslavedAsAdult, servingTrainer }
  */
-export function slaveLoyalty() {
-  return null;
+export function slaveLoyalty({ enslavedAsAdult = true, servingTrainer = false } = {}) {
+  const t = optTable("slavery", "slaveLoyalty");
+  if (!t) return null;
+  if (enslavedAsAdult) return t.enslavedAsAdult ?? null;
+  return servingTrainer ? (t.trainerBonus ?? 0) : 0;
+}
+
+/**
+ * The liberation rule (JJ ~410, "Mother of Dragons Memorial Rule"): a
+ * fanatic-loyalty result on liberation by a BUYER (not their enslaver)
+ * sets base loyalty and reduces pay to basic upkeep.
+ */
+export function liberationTerms() {
+  const t = optTable("slavery", "slaveLoyalty");
+  if (!t) return null;
+  return { fanaticLoyalty: t.liberatedFanaticLoyalty ?? null, upkeep: t.liberatedUpkeep ?? null };
 }
