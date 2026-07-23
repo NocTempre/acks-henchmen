@@ -199,15 +199,28 @@ function generateOccupationRaw(rand) {
     for (const id of Object.keys(subs)) if (t.includes(id)) return id;
     return null;
   };
+  // A row whose resolve column routes to an NPC CLASS (the book's own
+  // reroll bands for civilian draws: 84-85, 92-93, 96-97, and the
+  // uncovered 99-00) rerolls — the class trajectory rolls separately.
+  const classRouted = (resolve) => /class/i.test(String(resolve ?? ""));
   for (let tries = 0; tries < 12; tries++) {
     const roll = Math.floor(rand() * 100) + 1;
     const row = types.find((r) => {
       const b = r.bands?.generalStreet;
       return b && roll >= (b.min ?? 1) && roll <= (b.max ?? b.min ?? 100);
     });
-    const cat = row ? routeKey(row.resolve) : null;
+    if (!row) continue; // band uncovered by the street column → reroll
+    if (classRouted(row.resolve)) continue;
+    const cat = routeKey(row.resolve);
     const rows = cat ? subs[cat]?.rows : null;
-    if (!rows?.length) continue; // class-routed / missing sub-table → reroll
+    if (!rows?.length) {
+      // No d100 sub-table exists for this civilian row (the printing's
+      // hosteller: "inns are always owned by innkeepers") — the row's own
+      // category IS the occupation.
+      const label = String(row.type ?? "").replace(/([a-z])([A-Z])/g, "$1 $2");
+      if (!label) continue;
+      return { category: row.type, occupation: label.replace(/\b\w/g, (c) => c.toUpperCase()) };
+    }
     const r2 = Math.floor(rand() * 100) + 1;
     const occ = rows.find((x) => r2 >= (x.min ?? 1) && r2 <= (x.max ?? x.min ?? 100));
     if (!occ?.occupation) continue;

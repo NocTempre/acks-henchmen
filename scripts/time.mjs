@@ -15,7 +15,8 @@ export function now() {
 }
 
 export function secondsPerMonth() {
-  return (Number(getSetting("daysPerMonth")) || 30) * SECONDS_PER_DAY;
+  // No-calendar fallback: 4 weeks (28 days), per RAW's weekly market cadence.
+  return (Number(getSetting("daysPerMonth")) || 28) * SECONDS_PER_DAY;
 }
 
 /* ------------------------- calendar alignment ------------------------- */

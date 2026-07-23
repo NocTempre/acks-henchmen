@@ -12,10 +12,12 @@
           {{localize "ACKS-HENCHMEN.location.searchFee"}}: <strong>{{searchFeeFormula}}</strong> gp/{{localize "ACKS-HENCHMEN.location.perWeek"}}
         </span>
         {{/if}}
-        {{#if isGM}}
+        {{#if canProcess}}
         <button type="button" data-action="processNow" data-tooltip="{{localize 'ACKS-HENCHMEN.location.processNowHint'}}">
           <i class="fas fa-rotate"></i> {{localize "ACKS-HENCHMEN.location.processNow"}}
         </button>
+        {{/if}}
+        {{#if isGM}}
         <button type="button" data-action="advanceWeek" data-tooltip="{{localize 'ACKS-HENCHMEN.location.advanceWeekHint'}}">
           <i class="fas fa-forward"></i> {{localize "ACKS-HENCHMEN.location.advanceWeek"}}
         </button>
@@ -421,6 +423,18 @@
         <tbody>
           {{#each ledger}}
           <tr><td>{{gp}} gp</td><td>{{postingId}}</td></tr>
+          {{/each}}
+        </tbody>
+      </table>
+    </details>
+
+    <details class="section">
+      <summary>{{localize "ACKS-HENCHMEN.location.marketLog"}} ({{marketLog.length}})</summary>
+      <p class="hint">{{localize "ACKS-HENCHMEN.location.marketLogHint"}}</p>
+      <table class="ledger-table">
+        <tbody>
+          {{#each marketLog}}
+          <tr><td>{{typeLabel}}</td><td>{{note}}</td><td class="hint">{{when}}</td></tr>
           {{/each}}
         </tbody>
       </table>

@@ -229,7 +229,8 @@ export function checkHenchmanLimit(employer) {
 export async function hire(location, candidateId, employer, opts = {}) {
   const candidate = getCandidate(location, candidateId);
   if (!candidate) return { error: "no-candidate" };
-  if (!["available"].includes(candidate.status)) return { error: "not-available" };
+  const okStatus = candidate.status === "available" || (opts.fromQueue && candidate.status === "reserved");
+  if (!okStatus) return { error: "not-available" };
 
   // Attributes roll ONCE, at hire (3d6 ×6 in order, RR 168) — class and
   // level were fixed when the monthly pool was rolled.
@@ -297,7 +298,16 @@ export async function hire(location, candidateId, employer, opts = {}) {
       cha: { value: candidate.attributes.cha },
     };
   }
-  const actor = await Actor.create(actorData);
+  // Actor creation needs a permission the seat may not have (player hiring
+  // with no GM online and no Create Actor grant) — callers turn this error
+  // into a QUEUED hire that materializes at the next GM connect.
+  let actor = null;
+  try {
+    actor = await Actor.create(actorData);
+  } catch {
+    actor = null;
+  }
+  if (!actor) return { error: "actor-create-denied" };
 
   // Grant the candidate's proficiency package (JJ 254-257) as real ability
   // items via the lib `ability-provider` contract — the items' effects then
@@ -383,6 +393,15 @@ export async function hire(location, candidateId, employer, opts = {}) {
 
   // 5. Mark the candidate hired and pay the signing bonus if any.
   await updateCandidate(location, candidateId, { status: "hired" });
+  // Market ledger (rollback record): who signed with whom, and when.
+  try {
+    const log = (location.system.marketLog ?? []).map((l) => l.toObject?.() ?? l);
+    const entry = { time: now(), type: "hire", note: `${actor.name} → ${employer.name} (${candidate.wageGp ?? "?"}gp)` };
+    const capped = [...log, entry].slice(-100);
+    await location.update({ "system.marketLog": capped });
+  } catch {
+    /* ledger is best-effort */
+  }
   if (opts.signingBonusGp > 0) {
     await adapter.spendGold(
       employer,

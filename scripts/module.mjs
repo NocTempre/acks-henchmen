@@ -26,6 +26,7 @@ import { ThrowDialog, openThrowDialog } from "./apps/throw-dialog.mjs";
 import { openPostingDialog } from "./apps/posting-dialog.mjs";
 import { openRecruitDialog, openRecruitSpecial } from "./apps/recruit-dialog.mjs";
 import { createPosting, processLocation, processAllLocations, effectiveMarketClass } from "./engine/recruitment.mjs";
+import { materializePendingHires } from "./apps/recruit-dialog.mjs";
 import { postSlaveMarketCard, slaveryEnabled } from "./engine/slavery-market.mjs";
 import { hire, checkHenchmanLimit, addSpecialHire, hireExistingActor } from "./engine/hire.mjs";
 import * as candidateRules from "./rules/candidates.mjs";
@@ -136,6 +137,7 @@ Hooks.once("setup", async () => {
     effectiveMarketClass,
     hire,
     checkHenchmanLimit,
+    materializePendingHires,
     // special hires (real actors: GM-placed or found on adventures)
     addSpecialHire,
     registerFoundRecruit: (location, actor, opts = {}) => addSpecialHire(location, actor, { ...opts, origin: "found" }),
@@ -187,6 +189,14 @@ Hooks.once("ready", () => {
     }
   }
 
+  // Hires accepted while no seat could create actors (players hiring with
+  // no GM online) — materialize their queued actors now.
+  if (game.user === game.users.activeGM) {
+    for (const location of game.actors.filter((a) => a.type === LOCATION_TYPE)) {
+      materializePendingHires(location).catch((err) => console.error(`${MODULE_ID} | pending-hire sweep failed`, err));
+    }
+  }
+
   // Location schema migration (GM): v2 moved availability from per-posting
   // pools to the location's shared market — old-shape postings/candidates
   // (pre-0.3.0 test data) cannot be converted and are cleared.
@@ -212,7 +222,13 @@ Hooks.once("ready", () => {
 
   // GM-side due-processing whenever world time moves (posting aging, arrival
   // tranches, weekly fees, month rollover). Idempotent per posting.
-  onTimeAdvanced((worldTime) => processAllLocations(worldTime));
+  onTimeAdvanced(async () => {
+    await processAllLocations();
+    // time moved with a GM present: materialize any hires queued while offline
+    for (const location of game.actors.filter((a) => a.type === LOCATION_TYPE)) {
+      await materializePendingHires(location).catch(() => null);
+    }
+  });
 
   // Chat command: /recruit opens the recruitment board for the user's actor.
   try {
@@ -234,12 +250,14 @@ Hooks.once("ready", () => {
 });
 
 /* A location is a public bulletin board: new location actors default to
- * OBSERVER so players can open the sheet, post searches, and recruit
- * without the GM hand-editing permissions (explicit ownership wins). */
+ * OWNER so players can post searches, run due processing, and hire WITHOUT
+ * any GM client online (user direction 2026-07-22). The sheet still hides
+ * GM tabs from players; a stricter table sets ownership down by hand
+ * (explicit ownership in the creation data always wins). */
 Hooks.on("preCreateActor", (doc, data) => {
   if (doc.type !== `${MODULE_ID}.location`) return;
   if (data?.ownership?.default != null) return;
-  doc.updateSource({ "ownership.default": CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER });
+  doc.updateSource({ "ownership.default": CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER });
 });
 
 /* Bind event-card buttons (v14 AppV2 convention: HTMLElement hook only —

@@ -1,4 +1,4 @@
-/* global game, ui, foundry, fromUuidSync, fromUuid, RollTable, TextEditor, Hooks */
+/* global game, ui, foundry, fromUuidSync, fromUuid, RollTable, TextEditor, Hooks, CONST */
 /**
  * LocationSheet — ActorSheetV2 for the `acks-henchmen.location` sub-type.
  *
@@ -95,6 +95,9 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     context.actor = actor;
     context.system = sys;
     context.isGM = game.user.isGM;
+    // Owners may run due processing (idempotent) so arrivals reveal
+    // without waiting on a GM click; the clock itself is the GM's.
+    context.canProcess = game.user.isGM || actor.testUserPermission(game.user, "OWNER");
     context.marketClass = sys.marketClass;
     context.marketClassRoman = ["I", "II", "III", "IV", "V", "VI"][sys.marketClass - 1];
     context.searchFeeFormula = (() => {
@@ -266,6 +269,16 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     context.slander = (sys.slander ?? []).map((s, index) => ({ ...(s.toObject?.() ?? s), index }));
     context.ledger = (sys.searchLedger ?? []).slice(-20).reverse();
     context.ledgerTotal = (sys.searchLedger ?? []).reduce((s, l) => s + l.gp, 0);
+    // Market ledger (rollback record) — newest first, day-stamped.
+    context.marketLog = (sys.marketLog ?? [])
+      .map((l) => l.toObject?.() ?? l)
+      .slice(-30)
+      .reverse()
+      .map((l) => ({
+        ...l,
+        typeLabel: game.i18n.localize(`ACKS-HENCHMEN.marketLog.${l.type}`),
+        when: game.i18n.format("ACKS-HENCHMEN.marketLog.day", { day: Math.floor(l.time / SECONDS_PER_DAY) }),
+      }));
 
     // Tabs: labels carry live counts; the GM tabs exist only for GMs.
     context.tabs = this._prepareTabs("primary");
@@ -394,8 +407,10 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
   static async #onClosePosting(_event, target) {
     const posting = this.#posting(target);
     if (!posting) return;
-    if (game.user.isGM) {
-      await closePosting(this.actor, posting.id);
+    // Local-first: location owners (players on an OWNER-default bulletin
+    // board) close directly; only permission-less seats relay.
+    if (game.user.isGM || this.actor.testUserPermission(game.user, "OWNER")) {
+      await closePosting(this.actor, posting.id, { requestUserId: game.user.isGM ? null : game.user.id });
     } else {
       await executeAsGM("closePosting", {
         locationUuid: this.actor.uuid,

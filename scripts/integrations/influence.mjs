@@ -18,7 +18,6 @@
 import { MODULE_ID } from "../constants.mjs";
 import HenchmanRecord from "../data/henchman-record.mjs";
 import * as adapter from "../acks-adapter.mjs";
-import { executeAsGM } from "../sockets.mjs";
 
 const INFLUENCE_ID = "acks-influence";
 
@@ -144,7 +143,11 @@ export function registerInfluenceIntegration() {
         if (payload.mode === "hiring") {
           const signingTier = signingTierFromParts(payload.parts);
           const signingGp = signingTier > 0 ? (context.signingTiers?.[signingTier] ?? 0) : 0;
-          await executeAsGM("hiringOutcome", {
+          // Local-first: a seat that can write the location applies the
+          // outcome itself — no GM client required (dynamic import avoids
+          // the module cycle with the recruit dialog).
+          const { deliverHiringOutcome } = await import("../apps/recruit-dialog.mjs");
+          await deliverHiringOutcome({
             locationUuid: context.locationUuid,
             candidateId: context.candidateId ?? null,
             specialHireId: context.specialHireId ?? null,

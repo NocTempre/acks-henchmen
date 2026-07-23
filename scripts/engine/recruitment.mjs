@@ -1,4 +1,4 @@
-/* global game, foundry, Roll, Hooks, ChatMessage */
+/* global game, foundry, Roll, Hooks, ChatMessage, CONST */
 /**
  * Recruitment engine — RAW model (RR 162, JJ 118):
  *
@@ -21,7 +21,7 @@
  * All processing is idempotent (worldTime watermarks) — updateWorldTime
  * re-fires are safe.
  */
-import { MODULE_ID, HOOKS, SECONDS_PER_WEEK } from "../constants.mjs";
+import { MODULE_ID, HOOKS, SECONDS_PER_DAY, SECONDS_PER_WEEK } from "../constants.mjs";
 import {
   rollMonthlyPool,
   arrivalSplit,
@@ -35,6 +35,7 @@ import { generateIdentity, classInfo } from "../rules/identity.mjs";
 import { henchmanWage } from "../rules/wages.mjs";
 import { getTable, optTable } from "../rules/tables.mjs";
 import { sumEffectModifiers } from "../effects.mjs";
+import { getSetting } from "../settings.mjs";
 import * as adapter from "../acks-adapter.mjs";
 import { registerSocketAction } from "../sockets.mjs";
 import { now, secondsPerMonth, calendarMonthStart, sameMarketMonth } from "../time.mjs";
@@ -115,6 +116,12 @@ function isMassSpec(spec) {
 
 function demographicsOf(location) {
   return (location.system.demographics ?? []).map((d) => d.toObject?.() ?? d);
+}
+
+/** Append to the location's market ledger (rollback record), capped. */
+export function marketLogAppend(list, time, type, note) {
+  const out = [...list, { time, type, note }];
+  return out.length > 100 ? out.slice(-100) : out;
 }
 
 /**
@@ -504,6 +511,7 @@ export async function processLocation(location, currentTime = now()) {
   let candidates = (sys.candidates ?? []).map((c) => c.toObject?.() ?? foundry.utils.deepClone(c));
   let marketRolls = (sys.marketRolls ?? []).map((r) => r.toObject?.() ?? foundry.utils.deepClone(r));
   const ledger = (sys.searchLedger ?? []).map((l) => l.toObject?.() ?? foundry.utils.deepClone(l));
+  let marketLog = (sys.marketLog ?? []).map((l) => l.toObject?.() ?? l);
   let changed = false;
   let monthAnchorTime = sys.monthAnchorTime || 0;
   const arrivals = new Map();
@@ -543,6 +551,12 @@ export async function processLocation(location, currentTime = now()) {
     candidates = [...candidates.filter((c) => c.privateToUuid), ...month.candidates];
     marketRolls = month.marketRolls;
     changed = monthRolled = true;
+    marketLog = marketLogAppend(
+      marketLog,
+      currentTime,
+      "monthRoll",
+      `anchor ${monthAnchorTime}: ${month.marketRolls.length} segments, ${month.candidates.length} candidates`
+    );
   }
   // Optional RAW slavery (JJ 409): each fresh market month, remind the GM
   // what the slave market offers. Gated by setting + imported tables.
@@ -660,6 +674,7 @@ export async function processLocation(location, currentTime = now()) {
       "system.monthAnchorTime": monthAnchorTime,
       "system.specialHires": specialHires,
       "system.searchLedger": ledger,
+      "system.marketLog": marketLog,
     });
     for (const [segment, count] of arrivals) {
       Hooks.callAll(HOOKS.CANDIDATES_ARRIVED, { location, segment, count });
@@ -706,14 +721,16 @@ registerSocketAction("createPosting", async ({ locationUuid, spec, employerUuid,
   await createPosting(location, spec, employerDoc?.actor ?? employerDoc, { playersSeeDetails, requestUserId });
 });
 
-/** Process every location actor in the world (GM-side time hook target). */
-export async function processAllLocations(currentTime = now()) {
+/** Process every location actor in the world (GM-side time hook target).
+ *  Each location computes its own effective time (market offsets included). */
+export async function processAllLocations() {
   const type = `${MODULE_ID}.location`;
   for (const actor of game.actors.filter((a) => a.type === type)) {
     try {
-      await processLocation(actor, currentTime);
+      await processLocation(actor);
     } catch (err) {
       console.error(`${MODULE_ID} | processing ${actor.name} failed`, err);
     }
   }
 }
+

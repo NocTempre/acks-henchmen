@@ -124,7 +124,7 @@ async function launchOffer({ location, employer, offer }) {
     onResolve: async (result) => {
       const signingTier = result.parts.find((p) => p.id === "signingBonus")?.value ?? 0;
       const signingGp = signingTier > 0 ? (signing.tiers[signingTier] ?? 0) : 0;
-      await executeAsGM("hiringOutcome", {
+      await deliverHiringOutcome({
         locationUuid: location.uuid,
         candidateId: offer.candidateId ?? null,
         specialHireId: offer.specialHireId ?? null,
@@ -253,6 +253,45 @@ export async function handleHiringOutcomePayload(payload) {
   }
 }
 
+/**
+ * Route a resolved hiring roll to whoever can APPLY it — no GM client
+ * required (user direction 2026-07-22): a seat that can write the location
+ * (GM, or a player on an OWNER-default bulletin board) applies locally;
+ * otherwise the GM socket relay carries it.
+ */
+export async function deliverHiringOutcome(payload) {
+  const doc = await fromUuid(payload.locationUuid).catch(() => null);
+  const location = doc?.actor ?? doc;
+  const canLocal = game.user.isGM || (location?.testUserPermission?.(game.user, "OWNER") ?? false);
+  if (canLocal) return handleHiringOutcomePayload(payload);
+  return executeAsGM("hiringOutcome", payload);
+}
+
+/**
+ * Materialize hires accepted while no seat could create actors (queued on
+ * the location). Runs on GM clients: at ready and after due processing.
+ */
+export async function materializePendingHires(location) {
+  if (!game.user.isGM) return;
+  const pending = (location.system.pendingHires ?? []).map((p) => p.toObject?.() ?? foundry.utils.deepClone(p));
+  if (!pending.length) return;
+  const remaining = [];
+  for (const entry of pending) {
+    const employerDoc = await fromUuid(entry.employerUuid).catch(() => null);
+    const employer = employerDoc?.actor ?? employerDoc;
+    if (!employer) continue; // employer gone — drop the queue entry
+    const opts = { elan: entry.result?.outcome === "acceptElan", signingBonusGp: entry.signingGp, origin: "market", fromQueue: true };
+    const hired = entry.specialHireId
+      ? await hireExistingActor(location, entry.specialHireId, employer, opts)
+      : await hire(location, entry.candidateId, employer, opts);
+    if (hired?.error && hired.error !== "not-available") {
+      console.warn(`${MODULE_ID} | queued hire failed (${hired.error}) — keeping in queue`, entry);
+      remaining.push(entry);
+    }
+  }
+  await location.update({ "system.pendingHires": remaining });
+}
+
 registerSocketAction("hiringOutcome", handleHiringOutcomePayload);
 
 async function handleOutcome({ location, candidateId, specialHireId, employer, result, signingGp }) {
@@ -281,7 +320,27 @@ async function handleOutcome({ location, candidateId, specialHireId, employer, r
       const hired = specialHireId
         ? await hireExistingActor(location, specialHireId, employer, opts)
         : await hire(location, candidateId, employer, opts);
-      if (hired.error) {
+      if (hired.error === "actor-create-denied") {
+        // No GM online and this seat cannot create actors: RESERVE the
+        // candidate and QUEUE the hire — it materializes at next GM connect.
+        const entry = {
+          id: foundry.utils.randomID(),
+          candidateId: candidateId ?? "",
+          specialHireId: specialHireId ?? "",
+          employerUuid: employer.uuid,
+          signingGp: signingGp ?? 0,
+          time: now(),
+          result: { outcome: result.outcome, natural: result.natural ?? 0, total: result.total ?? 0 },
+        };
+        const queue = [...(location.system.pendingHires ?? []).map((p) => p.toObject?.() ?? p), entry];
+        const log = [...(location.system.marketLog ?? []).map((l) => l.toObject?.() ?? l), { time: now(), type: "reserve", note: `queued hire for ${employer.name}` }].slice(-100);
+        await location.update({ "system.pendingHires": queue, "system.marketLog": log });
+        if (candidateId) await updateCandidate(location, candidateId, { status: "reserved" });
+        ChatMessage.create({
+          content: game.i18n.format("ACKS-HENCHMEN.hire.queuedChat", { employer: employer.name }),
+          speaker: ChatMessage.getSpeaker({ actor: employer }),
+        });
+      } else if (hired.error) {
         ui.notifications.error(game.i18n.localize(`ACKS-HENCHMEN.hire.error.${hired.error}`));
       }
       break;

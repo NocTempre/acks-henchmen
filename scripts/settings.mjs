@@ -13,7 +13,7 @@ export function registerSettings() {
     scope: "world",
     config: true,
     type: Number,
-    default: 30,
+    default: 28, // 4 weeks — the no-calendar market cadence
   });
   reg("advanceWorldTime", {
     name: "ACKS-HENCHMEN.setting.advanceWorldTime",

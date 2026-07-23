@@ -126,7 +126,9 @@ function candidateField() {
     status: new fields.StringField({
       required: true,
       initial: "pending",
-      choices: ["pending", "available", "hired", "refused", "slandered", "withdrawn"],
+      // "reserved": accepted with no GM online and no actor-create permission —
+      // the hire is QUEUED (pendingHires) and materializes at next GM connect.
+      choices: ["pending", "available", "hired", "reserved", "refused", "slandered", "withdrawn"],
     }),
     refusals: new fields.ArrayField(
       new fields.SchemaField({
@@ -206,6 +208,33 @@ export class LocationData extends foundry.abstract.TypeDataModel {
       // each month's beginning even if nobody is hiring — so a party that
       // starts searching in week 2 finds the town as it already is.
       monthAnchorTime: int(0),
+      // Append-only MARKET LEDGER: what the market did and when (month
+      // rolls, directed replacements, hires) — the GM's record for manual
+      // rollbacks after clock adjustments. Capped to the recent past.
+      marketLog: new fields.ArrayField(
+        new fields.SchemaField({
+          time: int(),
+          type: str(), // monthRoll | replace | hire | reserve
+          note: str(),
+        })
+      ),
+      // Hires accepted with no GM online and no actor-create permission —
+      // materialized into real actors at the next GM connect.
+      pendingHires: new fields.ArrayField(
+        new fields.SchemaField({
+          id: str(),
+          candidateId: str(),
+          specialHireId: str(),
+          employerUuid: str(),
+          signingGp: num(),
+          time: int(),
+          result: new fields.SchemaField({
+            outcome: str(),
+            natural: num({ integer: true }),
+            total: num({ integer: true }),
+          }),
+        })
+      ),
       // The LOCATION's monthly availability ledger: one entry per generic
       // segment rolled this month (availability is a property of the market,
       // RR 162 — shared by all recruiters; rolled once per month per type).

@@ -146,9 +146,11 @@ export class PostingDialog extends HandlebarsApplicationMixin(ApplicationV2) {
       }
     }
 
-    // Players cannot write the location actor — relay through the GM socket
-    // (ownership + criteria re-checked engine-side against requestUserId).
-    if (!game.user.isGM) {
+    // LOCAL-FIRST: a seat that can write the location posts directly — no GM
+    // client required (locations default to OWNER; user direction
+    // 2026-07-22). Seats without write fall back to the GM socket relay.
+    const canLocal = game.user.isGM || this.location.testUserPermission(game.user, "OWNER");
+    if (!canLocal) {
       await executeAsGM("createPosting", {
         locationUuid: this.location.uuid,
         spec,
@@ -162,6 +164,7 @@ export class PostingDialog extends HandlebarsApplicationMixin(ApplicationV2) {
 
     const result = await createPosting(this.location, spec, employer, {
       playersSeeDetails: data.playersSeeDetails !== false,
+      requestUserId: game.user.isGM ? null : game.user.id,
     });
     if (result.error) {
       ui.notifications.error(game.i18n.localize(`ACKS-HENCHMEN.posting.error.${result.error}`));

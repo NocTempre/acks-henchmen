@@ -67,9 +67,10 @@ export async function rollAvailability(expr, rollDice, rand = Math.random) {
  */
 export function arrivalSplit(total) {
   if (total <= 0) return [0, 0, 0];
+  // RR 162: ½ (round up) arrive week 1, ¼ (round DOWN — may be zero) week 2,
+  // the rest week 3, none week 4.
   const week1 = Math.ceil(total / 2);
-  let week2 = Math.max(1, Math.floor(total / 4));
-  week2 = Math.min(week2, total - week1);
+  const week2 = Math.min(Math.floor(total / 4), total - week1);
   const week3 = total - week1 - week2;
   return [week1, Math.max(0, week2), Math.max(0, week3)];
 }
