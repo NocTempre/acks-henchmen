@@ -134,17 +134,25 @@ export function generateName(rand, cultureId, gender) {
   return { given, full };
 }
 
-/** One-line appearance from the culture's palette. */
+/**
+ * One-line appearance from the culture's palette. Colours come from the
+ * imported `people.cultureAppearance` blocks (the culture descriptions'
+ * own hair/eye sentences); a culture entry may also carry them inline.
+ * Whatever is present is used — a printing that states only hair still
+ * yields a line, and no palette at all yields none.
+ */
 export function generateAppearance(rand, cultureId) {
-  const culture = getTable("people", "cultures").list[cultureId];
-  // Appearance palettes are book PROSE, not imported as data — a culture may
-  // carry only its names. No palette → no generated line (the sheet can show
-  // a @PdfText reference to the culture description instead).
-  if (!culture?.hair?.length || !culture?.eyes?.length || !culture?.skin?.length) return "";
-  const hair = pick(rand, culture.hair);
-  const eyes = pick(rand, culture.eyes);
-  const skin = pick(rand, culture.skin);
-  return `${hair} hair, ${eyes} eyes, ${skin} skin; ${culture.build}`;
+  const culture = getTable("people", "cultures").list[cultureId] ?? {};
+  const palette = optTable("people", "cultureAppearance")?.cultures?.[cultureId] ?? {};
+  const hair = culture.hair?.length ? culture.hair : palette.hair;
+  const eyes = culture.eyes?.length ? culture.eyes : palette.eyes;
+  const skin = culture.skin?.length ? culture.skin : palette.skin;
+  const parts = [];
+  if (hair?.length) parts.push(`${pick(rand, hair)} hair`);
+  if (eyes?.length) parts.push(`${pick(rand, eyes)} eyes`);
+  if (skin?.length) parts.push(`${pick(rand, skin)} skin`);
+  if (!parts.length) return "";
+  return culture.build ? `${parts.join(", ")}; ${culture.build}` : parts.join(", ");
 }
 
 /**
