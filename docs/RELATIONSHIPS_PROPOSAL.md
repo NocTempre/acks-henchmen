@@ -125,3 +125,40 @@ only the shape agrees.
 `{scope:"party", uuid: partyKey}` (no pre-migration data was
 individual-scoped, so no character entries are produced). `slanderCountFor`
 keeps the string shim for one release.
+
+---
+
+## Enhancement — relationship map / web browser (PLANNED, not implemented)
+
+A graph view over both edges: attitudes (character→character) and slanders
+(party/character→location) rendered as one navigable web. **Integration
+first** (user direction 2026-07-23): adopt or feed a maintained community
+module before considering a bespoke viewer. Survey of the field (2026-07-23,
+family rule: v14-verified or out):
+
+| Module | Author | State (2026-07-23) | Fit |
+|---|---|---|---|
+| [Foundry Graph](https://foundryvtt.com/packages/foundry-graph) | Luca Gioppo | 0.14.3, Jun 2026, **v14 verified**, AGPL-3.0 | **Primary candidate.** Entity-agnostic nodes (Actors/Items/Scenes/Journals), typed styled edges, per-world persistence, template-based graph types, `api.openGraphById()`. Gaps: beta ("schemas may change"), no *documented* write API or graph-type registration yet. |
+| [Target Tree](https://foundryvtt.com/packages/target-tree) | LoboWerewolf | 3.0.0, ~4 wks, **v14 verified** | Networks/hierarchies, drag-drop actors, realtime sync, per-player visibility. No API — display-only unless one appears. |
+| [Relations Tracker](https://foundryvtt.com/packages/relations-tracker) | LoboWerewolf | 2.0.1, ~4 wks, **v14 verified** | Sheet-integrated per-character relations — *overlaps our attitude store* rather than complements it; adopting it as a store would mean double bookkeeping. Watch only. |
+| [Lore Reference Board](https://foundryvtt.com/packages/lore-reference-board) | Elemor | 2.2.0, ~2 wks, v12–14 | Faction relationship board inside a much larger GM-screen toolbox; heavier dependency than the feature warrants. |
+| [R-Maps](https://foundryvtt.com/packages/fvtt-r-maps) | mclemente | 1.1.0, **stale ~1 yr, v13 max** | Canvas-token corkboard; fails the v14-only rule. Out. |
+
+**Ground rules for whichever lands:**
+
+1. **Projection, not relocation.** The stores stay where they are (attitude
+   Items on the influencer, slander subjects on the location). The map module
+   receives a *projection* — nodes and edges generated from our stores — and
+   is never the source of truth. `HOOKS.SLANDER_CHANGED` and
+   `acksInfluenceAttitudeChanged` already exist to drive incremental refresh.
+2. **Soft integration**, like the influence integration: guarded behind
+   `game.modules.get(id)?.active`, zero hard dependency, everything degrades
+   to today's ledger/section UI.
+3. **Upstream before bespoke.** Foundry Graph's model (typed edges, graph
+   types, macro API) is one small step from what we need — a data-driven
+   graph-definition/write API. File an upstream issue/PR for that before
+   writing any renderer of our own; the author is active. Bespoke (a D3/SVG
+   viewer in acks-henchmen) is the last resort, only if no candidate grows an
+   API and the beta schemas stabilize elsewhere.
+4. AGPL-3.0 (Foundry Graph) is fine for runtime API integration — no code is
+   copied into this GPL-family module.
