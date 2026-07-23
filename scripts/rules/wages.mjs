@@ -28,11 +28,16 @@ export function mercenaryMorale(troopType, demiHuman = false) {
   return row.morale + (demiHuman ? 1 : 0);
 }
 
-/** Base morale for a specialist type (RR 166 role overrides, default -2). */
+/** Base morale for a specialist type (RR 166 role groups — the imported
+ *  prose values; which TYPE keys fall in which group is code glue). */
 export function specialistMorale(specialistType) {
-  const table = optTable("wages", "baseMorale");
-  if (!table) return 0; // neutral until the wages tables are imported
-  return table.overrides[specialistType] ?? table.specialistDefault;
+  const t = optTable("wages", "baseMorale");
+  if (!t) return 0; // neutral until the wages tables are imported
+  const k = String(specialistType ?? "");
+  if (/^mariner(Rower|Sailor)$/.test(k)) return t.rowersSailors ?? t.specialistDefault ?? 0;
+  if (/^(marinerNavigator|marinerCaptain|scout)$/.test(k)) return t.navigatorsCaptainsScouts ?? 0;
+  if (/^(marshal|mercOfficer|marinerMaster)/.test(k)) return t.marshalsMastersOfficers ?? 0;
+  return t.specialistDefault ?? 0;
 }
 
 /** Max hireable henchman level for an employer level (RR 168). */
