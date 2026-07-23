@@ -448,3 +448,13 @@
   overflow-y: auto;
   flex: 1;
 }
+
+/* Directed-search replacement: the candidate your search found — starred
+   and tinted for the posting recruiter, available the whole month. */
+.acks-henchmen.location-sheet tr.search-hit td:first-child {
+  color: var(--color-text-hyperlink, #1c60a5);
+  font-weight: bold;
+}
+.acks-henchmen.location-sheet tr.search-hit .fa-star {
+  color: #c9a227;
+}

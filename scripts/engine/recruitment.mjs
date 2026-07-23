@@ -49,46 +49,39 @@ export async function rollDice(formula) {
 
 /** Kinds that draw on the shared location pool vs. private JJ searches. */
 export const GENERIC_KINDS = ["henchman", "mercenary", "specialist"];
-export const PRIVATE_KINDS = ["henchmanByClass", "henchmanByProficiency"];
+export const PRIVATE_KINDS = ["henchmanByClass", "henchmanByClassProficiency", "henchmanByProficiency"];
 
-/** Shared-pool key for a generic spec. */
+/**
+ * Directed-search SPECIFICITY (user's RAW model): a successful directed
+ * search REPLACES rolled leveled henchmen still left in the month; when
+ * several searches contend, the more specific resolves first (random on
+ * ties). 4 = class+level, 3 = class, 2 = class proficiency, 1 = general
+ * proficiency.
+ */
+export function specSpecificity(spec) {
+  if (spec.kind === "henchmanByClass") return spec.level >= 1 ? 4 : 3;
+  if (spec.kind === "henchmanByClassProficiency") return 2;
+  if (spec.kind === "henchmanByProficiency") return 1;
+  return 0;
+}
+
+/** Shared-pool key for a generic spec. A GENERAL henchman post (the option
+ *  players buy — "an adventuring henchman") covers every henchman level. */
 export function segmentKeyFor(spec) {
-  if (spec.kind === "henchman") return `henchman:${spec.level ?? 0}`;
+  if (spec.kind === "henchman") return spec.general || spec.level == null ? "henchman:*" : `henchman:${spec.level}`;
   if (spec.kind === "mercenary") return `mercenary:${spec.troopType}`;
   if (spec.kind === "specialist") return `specialist:${spec.specialistType}`;
   return "";
 }
 
-/* ------------------------- advert easing ------------------------- */
+/* ------------------------- commissions ------------------------- */
 /**
- * A posting that has ADVERTISED THE SAME THING through a whole market month
- * eases that search one rarity step toward common FOR THE WHOLE LOCATION —
- * word gets around. The posting is designated (advertVeteran → post color);
- * the easing applies to every matching directed roll while the advert runs.
+ * A posting that has advertised THE SAME THING through a whole market month
+ * upgrades to a COMMISSION (the JJ mechanic): its own further rolls shift
+ * one rarity toward common. `advertVeteran` is stamped at the monthly roll
+ * on postings that already existed when the ending month began (a posting's
+ * spec is immutable, so it advertised the same thing throughout).
  */
-
-/** Easing key of a directed spec ("" for kinds with no rarity dimension). */
-export function specEaseKey(spec) {
-  if (spec.kind === "henchmanByClass") return `class:${String(spec.classKey ?? "").toLowerCase()}`;
-  if (spec.kind === "henchmanByProficiency") return `prof:${String(spec.proficiencyName ?? "").toLowerCase()}`;
-  return "";
-}
-
-/**
- * Keys eased by the location's long-running adverts. `advertVeteran` is
- * stamped at each monthly roll on postings that already existed when the
- * month just ended BEGAN (they ran that whole month unchanged — a posting's
- * spec is immutable); it keeps easing while the advert stays up.
- */
-export function advertEasedKeys(postings) {
-  const keys = new Set();
-  for (const p of postings) {
-    if (p.status !== "active" || !p.advertVeteran) continue;
-    const key = specEaseKey(p.spec?.toObject?.() ?? p.spec ?? {});
-    if (key) keys.add(key);
-  }
-  return keys;
-}
 
 /**
  * Effective market class for a recruiter's own dealings (fees, private
@@ -122,6 +115,55 @@ function demographicsOf(location) {
 export function marketLogAppend(list, time, type, note) {
   const out = [...list, { time, type, note }];
   return out.length > 100 ? out.slice(-100) : out;
+}
+
+/**
+ * Apply a successful DIRECTED SEARCH as pool REPLACEMENT (user's RAW model,
+ * JJ 118-119): up to `quantity` valid leveled henchmen still left in the
+ * month (pending or unhired) are randomly replaced by what the recruiter
+ * sought. Only step-3 rolled henchmen (level 1+, shared pool) qualify;
+ * class+level searches replace only their level. Replaced candidates are
+ * highlighted for the posting employer and stay available ALL month (no
+ * weekly churn). Mutates `candidates` in place; returns the replaced count.
+ */
+function applyDirectedReplacement({ location, spec, employerUuid, quantity, rarity, candidates }) {
+  if (!(quantity > 0)) return 0;
+  const eligible = candidates.filter(
+    (c) =>
+      String(c.segment ?? "").startsWith("henchman:") &&
+      (c.level ?? 0) >= 1 &&
+      ["pending", "available"].includes(c.status) &&
+      !c.highlightFor &&
+      (spec.kind !== "henchmanByClass" || spec.level == null || c.level === spec.level)
+  );
+  // random order among the eligible
+  for (let i = eligible.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [eligible[i], eligible[j]] = [eligible[j], eligible[i]];
+  }
+  const picks = eligible.slice(0, Math.min(quantity, eligible.length));
+  const demographics = demographicsOf(location);
+  for (const c of picks) {
+    const changesClass = spec.kind === "henchmanByClass" || spec.kind === "henchmanByClassProficiency";
+    if (changesClass && spec.classKey) {
+      c.classKey = spec.classKey;
+      c.classRarity = rarity ?? c.classRarity;
+      // a new class can mean a new race/culture — the person changes
+      const identity = generateIdentity({ demographics, level: c.level ?? 1, classKey: spec.classKey });
+      c.name = identity.name;
+      c.gender = identity.gender;
+      c.culture = identity.culture;
+      c.age = identity.age;
+      c.appearance = identity.appearance;
+    }
+    if (spec.kind === "henchmanByProficiency" || spec.kind === "henchmanByClassProficiency") {
+      const tag = `${spec.proficiencyName} ×${spec.proficiencyRanks ?? 1}`;
+      c.notes = c.notes ? `${c.notes} · ${tag}` : tag;
+    }
+    c.highlightFor = employerUuid ?? "";
+    c.monthLong = true;
+  }
+  return picks.length;
 }
 
 /**
@@ -380,14 +422,18 @@ export async function createPosting(location, rawSpec, employer, { dedicatedSear
     if (user && !user.isGM) {
       const employerActor = employer?.actor ?? employer;
       if (!employerActor || !employerActor.testUserPermission(user, "OWNER")) return { error: "not-yours" };
-      if (spec.kind === "henchman") return { error: "criteria-required" };
-      if (isPrivate && !(Number(spec.level) >= 1)) return { error: "level-required" };
+      // Players buy the listed options: the GENERAL henchman post, a
+      // mercenary/specialist TYPE, or a directed search naming its target.
+      if (spec.kind === "henchman" && !(spec.general || spec.level == null)) return { error: "criteria-required" };
+      if ((spec.kind === "henchmanByClass" || spec.kind === "henchmanByClassProficiency") && !spec.classKey) return { error: "criteria-required" };
+      if ((spec.kind === "henchmanByProficiency" || spec.kind === "henchmanByClassProficiency") && !String(spec.proficiencyName ?? "").trim())
+        return { error: "criteria-required" };
     }
   }
 
   // Alignment openness (directed class searches): an opposed-alignment
   // class is harder to recruit openly — rarity shift per the table.
-  if (spec.kind === "henchmanByClass" && !spec.alignmentShift) {
+  if ((spec.kind === "henchmanByClass" || spec.kind === "henchmanByClassProficiency") && !spec.alignmentShift) {
     const classAlignment = classInfo(spec.classKey)?.alignment;
     if (classAlignment) {
       const shifts = optTable("rarity", "alignmentRecruitment")?.shifts ?? {};
@@ -401,12 +447,14 @@ export async function createPosting(location, rawSpec, employer, { dedicatedSear
     const dup = postings.find((p) => p.status === "active" && p.segment === segment && p.employerUuid === (employer?.uuid ?? ""));
     if (dup) return { error: "duplicate-segment" };
   } else {
-    const specKey = JSON.stringify(spec);
+    // Once per month per TYPE of directed search per recruiter (user's RAW
+    // model): a second by-class search this month is blocked even for a
+    // different class.
     const dup = postings.find(
       (p) =>
         p.status === "active" &&
         p.employerUuid === (employer?.uuid ?? "") &&
-        JSON.stringify(p.spec.toObject?.() ?? p.spec) === specKey &&
+        (p.spec.toObject?.() ?? p.spec)?.kind === spec.kind &&
         sameMarketMonth(p.monthStartTime, currentTime)
     );
     if (dup) return { error: "duplicate-spec-this-month" };
@@ -435,28 +483,26 @@ export async function createPosting(location, rawSpec, employer, { dedicatedSear
   let nextRolls = null;
   let anchorUpdate = null;
 
+  let replacedCandidates = null;
+  let replacedCount = 0;
   if (isPrivate) {
+    // DIRECTED SEARCH → POOL REPLACEMENT (user's RAW model): the roll
+    // (final rarity vs. Henchman Availability by Market Class and Rarity)
+    // does not mint new people — it replaces rolled leveled henchmen still
+    // left in the month with what the recruiter sought.
     const mc = effectiveMarketClass(location, employer);
-    // A long-running advert for the same thing eases the whole location.
-    // Roll-time copy: the eased flag never enters the stored spec.
-    const rollSpec = advertEasedKeys(postings).has(specEaseKey(spec)) ? { ...spec, advertEased: true } : spec;
-    const result = await rollMonthlyPool(rollSpec, mc, rollDice, Math.random, location.system.classRarityTableId || "default");
+    const result = await rollMonthlyPool(spec, mc, rollDice, Math.random, location.system.classRarityTableId || "default");
     if (result.error) return { error: result.error };
-    let total = result.quantity;
-    // JJ: capped by the market's base henchman availability.
-    const cap = await rollMonthlyPool({ kind: "henchman", level: Math.max(1, spec.level ?? 1) }, mc, rollDice);
-    if (!cap.error && cap.quantity < total) total = cap.quantity;
-    posting.totalAvailable = total;
+    posting.totalAvailable = result.quantity;
     posting.rollDetail = result.detail;
-    newCandidates = await buildCandidates({
+    replacedCandidates = (location.system.candidates ?? []).map((c) => c.toObject?.() ?? foundry.utils.deepClone(c));
+    replacedCount = applyDirectedReplacement({
       location,
       spec,
-      total,
-      marketClass: mc,
-      segment: "",
-      privateToUuid: employer?.uuid ?? "",
-      monthStart: currentTime,
+      employerUuid: employer?.uuid ?? "",
+      quantity: result.quantity,
       rarity: result.rarity,
+      candidates: replacedCandidates,
     });
   } else {
     // The town's market is rolled at month start regardless of searches —
@@ -469,9 +515,15 @@ export async function createPosting(location, rawSpec, employer, { dedicatedSear
       rolls = month.marketRolls;
       anchorUpdate = currentTime;
     }
-    const entry = rolls.find((r) => r.segment === segment);
-    posting.totalAvailable = entry?.total ?? 0;
-    posting.rollDetail = entry?.detail ?? "";
+    if (segment === "henchman:*") {
+      const hench = rolls.filter((r) => r.segment.startsWith("henchman:"));
+      posting.totalAvailable = hench.reduce((s2, r) => s2 + (r.total ?? 0), 0);
+      posting.rollDetail = hench.map((r) => `${r.segment.split(":")[1]}: ${r.total}`).join(", ");
+    } else {
+      const entry = rolls.find((r) => r.segment === segment);
+      posting.totalAvailable = entry?.total ?? 0;
+      posting.rollDetail = entry?.detail ?? "";
+    }
   }
 
   const fee = await chargeWeeklyFee(location, employer, 1);
@@ -484,7 +536,16 @@ export async function createPosting(location, rawSpec, employer, { dedicatedSear
       { time: currentTime, gp: fee.gp, postingId: posting.id, paidByUuid: employer?.uuid ?? "" },
     ],
   };
-  if (newCandidates.length) {
+  if (replacedCandidates) {
+    // directed search: the pool itself was rewritten (replacements)
+    update["system.candidates"] = newCandidates.length ? [...replacedCandidates, ...newCandidates] : replacedCandidates;
+    update["system.marketLog"] = marketLogAppend(
+      (location.system.marketLog ?? []).map((l) => l.toObject?.() ?? l),
+      currentTime,
+      "replace",
+      `${posting.rollDetail || spec.kind}: ${replacedCount} of ${posting.totalAvailable} rolled replaced for ${employer?.name ?? "?"}`
+    );
+  } else if (newCandidates.length) {
     update["system.candidates"] = [
       ...(location.system.candidates ?? []).map((c) => c.toObject?.() ?? c),
       ...newCandidates,
@@ -494,7 +555,7 @@ export async function createPosting(location, rawSpec, employer, { dedicatedSear
   if (anchorUpdate) update["system.monthAnchorTime"] = anchorUpdate;
   await location.update(update);
   Hooks.callAll(HOOKS.POSTING_CREATED, { location, posting, employer });
-  return { posting, fee };
+  return { posting, fee, replaced: replacedCount };
 }
 
 /* ------------------------- time processing ------------------------- */
@@ -564,6 +625,17 @@ export async function processLocation(location, currentTime = now()) {
   // Keep active generic postings' info in sync with the current month.
   for (const posting of postings) {
     if (posting.status !== "active" || !posting.segment) continue;
+    if (posting.segment === "henchman:*") {
+      const hench = marketRolls.filter((r) => r.segment.startsWith("henchman:"));
+      const anchor = hench[0]?.monthStartTime;
+      if (hench.length && posting.monthStartTime !== anchor) {
+        posting.monthStartTime = anchor;
+        posting.totalAvailable = hench.reduce((s2, r) => s2 + (r.total ?? 0), 0);
+        posting.rollDetail = hench.map((r) => `${r.segment.split(":")[1]}: ${r.total}`).join(", ");
+        changed = true;
+      }
+      continue;
+    }
     const entry = marketRolls.find((r) => r.segment === posting.segment);
     if (entry && posting.monthStartTime !== entry.monthStartTime) {
       posting.monthStartTime = entry.monthStartTime;
@@ -586,12 +658,12 @@ export async function processLocation(location, currentTime = now()) {
 
   // 1b. Weekly churn: a SHARED-pool candidate stays on the market for ONE
   // WEEK after arriving — unhired, they take other work and DISAPPEAR.
-  // DIRECTED-search results (privateToUuid) are exempt: the specific
-  // henchman found for a recruiter stays available until hired or the
-  // month re-rolls (JJ 118's monthly cadence).
+  // Exempt: directed-search results (privateToUuid — legacy) and REPLACED
+  // candidates (monthLong): the person a recruiter's search found stays
+  // available the whole month instead of the weekly rotation.
   const before = candidates.length;
   candidates = candidates.filter(
-    (c) => !(c.status === "available" && !c.privateToUuid && currentTime - c.availableFromTime >= SECONDS_PER_WEEK)
+    (c) => !(c.status === "available" && !c.privateToUuid && !c.monthLong && currentTime - c.availableFromTime >= SECONDS_PER_WEEK)
   );
   if (candidates.length !== before) changed = true;
 
@@ -604,10 +676,6 @@ export async function processLocation(location, currentTime = now()) {
       changed = true;
     }
   }
-
-  // Location-wide advert easings for this month's directed rolls (stamped
-  // veterans above; a closed advert stops easing).
-  const easedKeys = advertEasedKeys(postings);
 
   // 2. Weekly fees per active posting (fee per week per type searched —
   // each posting pays its own ROLLED fee every week it runs).
@@ -623,44 +691,53 @@ export async function processLocation(location, currentTime = now()) {
       ledger.push({ time: currentTime, gp: fee.gp, postingId: posting.id, paidByUuid: posting.employerUuid });
       changed = true;
     }
-
-    // 3a. Private searches: monthly re-roll while the posting stays active
-    // (calendar months when the world runs a calendar). The fresh roll
-    // PURGES last month's rows (hired ones are actors now).
-    const privateDue =
-      calStart != null
-        ? posting.monthStartTime < calStart
-        : currentTime - posting.monthStartTime >= secondsPerMonth();
-    if (PRIVATE_KINDS.includes(posting.spec.kind) && privateDue) {
-      candidates = candidates.filter((c) => c.privateToUuid !== posting.employerUuid);
-      const mc = effectiveMarketClass(location, employer);
-      // Detached copy: the eased flag never writes back into the posting.
-      const spec = { ...(posting.spec.toObject?.() ?? posting.spec) };
-      if (easedKeys.has(specEaseKey(spec))) spec.advertEased = true;
-      const result = await rollMonthlyPool(spec, mc, rollDice, Math.random, sys.classRarityTableId || "default");
-      if (!result.error) {
-        let total = result.quantity;
-        const cap = await rollMonthlyPool({ kind: "henchman", level: Math.max(1, spec.level ?? 1) }, mc, rollDice);
-        if (!cap.error && cap.quantity < total) total = cap.quantity;
-        posting.totalAvailable = total;
-        posting.rollDetail = result.detail;
-        posting.monthStartTime = currentTime;
-        candidates.push(
-          ...(await buildCandidates({
-            location,
-            spec,
-            total,
-            marketClass: mc,
-            segment: "",
-            privateToUuid: posting.employerUuid,
-            monthStart: currentTime,
-            rarity: result.rarity,
-          }))
-        );
-      }
-      changed = true;
-    }
     posting.lastProcessedTime = currentTime;
+  }
+
+  // 3a. Directed searches re-roll monthly while active ("paying the fee and
+  // rolling again each month") and apply as POOL REPLACEMENT against the
+  // fresh month. Contending searches resolve MORE SPECIFIC FIRST (class+
+  // level > class > class proficiency > general proficiency), random order
+  // on ties; each consumes replacement targets before the next.
+  const duePrivates = postings.filter((p) => {
+    if (p.status !== "active" || !PRIVATE_KINDS.includes(p.spec.kind)) return false;
+    return calStart != null ? p.monthStartTime < calStart : currentTime - p.monthStartTime >= secondsPerMonth();
+  });
+  duePrivates.sort(
+    (a, b) =>
+      specSpecificity(b.spec.toObject?.() ?? b.spec) - specSpecificity(a.spec.toObject?.() ?? a.spec) || Math.random() - 0.5
+  );
+  for (const posting of duePrivates) {
+    const employerDoc = posting.employerUuid ? await fromUuid(posting.employerUuid).catch(() => null) : null;
+    const employer = employerDoc?.actor ?? employerDoc;
+    // legacy private candidates (pre-replacement model) purge on re-roll
+    candidates = candidates.filter((c) => c.privateToUuid !== posting.employerUuid);
+    const mc = effectiveMarketClass(location, employer);
+    // Detached copy; a month-old advert re-rolls AS A COMMISSION (its own
+    // rarity shifts one step toward common — the JJ mechanic).
+    const spec = { ...(posting.spec.toObject?.() ?? posting.spec) };
+    if (posting.advertVeteran) spec.commissioned = true;
+    const result = await rollMonthlyPool(spec, mc, rollDice, Math.random, sys.classRarityTableId || "default");
+    if (!result.error) {
+      posting.totalAvailable = result.quantity;
+      posting.rollDetail = result.detail;
+      posting.monthStartTime = currentTime;
+      const n = applyDirectedReplacement({
+        location,
+        spec,
+        employerUuid: posting.employerUuid,
+        quantity: result.quantity,
+        rarity: result.rarity,
+        candidates,
+      });
+      marketLog = marketLogAppend(
+        marketLog,
+        currentTime,
+        "replace",
+        `${result.detail || spec.kind}: ${n} of ${result.quantity} rolled replaced for ${employer?.name ?? "?"}`
+      );
+    }
+    changed = true;
   }
 
   // (Shared-segment rollover is handled by the month anchor in step 0 —

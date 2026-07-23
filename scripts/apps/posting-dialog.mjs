@@ -85,39 +85,53 @@ export class PostingDialog extends HandlebarsApplicationMixin(ApplicationV2) {
   static async #onSubmit(_event, _form, formData) {
     const data = foundry.utils.expandObject(formData.object);
     const employer = game.actors.get(data.employerId) ?? null;
-    const kind = data.kind;
-    const spec = { kind };
+    let kind = data.kind;
+    const spec = {};
 
-    if (kind === "henchman" || kind === "henchmanByClass" || kind === "henchmanByProficiency") {
+    if (kind === "henchmanGeneral") {
+      // the player-facing option: one post covers the whole henchman market
+      kind = "henchman";
+      spec.general = true;
+    } else if (kind === "henchman") {
       spec.level = Number(data.level) || 0;
     }
+    spec.kind = kind;
     if (kind === "henchmanByClass") {
       spec.classKey = data.classKey ?? "";
-      spec.levelShift = Math.max(0, (Number(data.level) || 1) - 1);
+      // level blank = "by class" (any level); set = "by class and level"
+      const level = data.level === "" || data.level == null ? null : Number(data.level);
+      if (level != null && level >= 1) {
+        spec.level = level;
+        spec.levelShift = Math.max(0, level - 1);
+      }
+      spec.commissioned = !!data.commissioned;
+    }
+    if (kind === "henchmanByClassProficiency") {
+      spec.classKey = data.classKey ?? "";
+      spec.proficiencyName = data.proficiencyName ?? "";
+      spec.proficiencyRanks = Number(data.proficiencyRanks) || 1;
       spec.commissioned = !!data.commissioned;
     }
     if (kind === "henchmanByProficiency") {
       spec.proficiencyName = data.proficiencyName ?? "";
       spec.proficiencyRanks = Number(data.proficiencyRanks) || 1;
-      // JJ specific searches: +1 rarity per level above 1st, same as class posts.
-      spec.levelShift = Math.max(0, (Number(data.level) || 1) - 1);
       spec.commissioned = !!data.commissioned;
     }
     if (kind === "mercenary") spec.troopType = data.troopType;
     if (kind === "specialist") spec.specialistType = data.specialistType;
 
-    // A player's post names what they want: a criterion beyond a warm body,
-    // and the level on leveled searches — it sets the price (wage).
+    // A player's post names what they want (the paid menu): general
+    // henchmen, a mercenary/specialist type, or a directed target.
     if (!game.user.isGM) {
-      if (kind === "henchman") {
+      if (kind === "henchman" && !spec.general) {
         ui.notifications.error(game.i18n.localize("ACKS-HENCHMEN.posting.error.criteria-required"));
         return;
       }
-      if ((kind === "henchmanByClass" || kind === "henchmanByProficiency") && !(spec.level >= 1)) {
-        ui.notifications.error(game.i18n.localize("ACKS-HENCHMEN.posting.error.level-required"));
+      if ((kind === "henchmanByClass" || kind === "henchmanByClassProficiency") && !spec.classKey) {
+        ui.notifications.error(game.i18n.localize("ACKS-HENCHMEN.posting.error.criteria-required"));
         return;
       }
-      if (kind === "henchmanByProficiency" && !spec.proficiencyName.trim()) {
+      if ((kind === "henchmanByProficiency" || kind === "henchmanByClassProficiency") && !spec.proficiencyName.trim()) {
         ui.notifications.error(game.i18n.localize("ACKS-HENCHMEN.posting.error.criteria-required"));
         return;
       }

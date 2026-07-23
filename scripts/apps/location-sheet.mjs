@@ -174,17 +174,15 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     const ownedUuids = game.user.isGM
       ? []
       : game.actors.filter((a) => a.testUserPermission(game.user, "OWNER")).map((a) => a.uuid);
-    // A posting covers its shared segment; a DIRECTED leveled post (the only
-    // henchman post players can make) also covers the shared henchman pool at
-    // its level — the recruiter is interviewing at that level, so the town's
-    // walk-ins of that level respond to the advert too.
+    // A posting covers its shared segment; the GENERAL henchman post
+    // ("henchman:*", the option players buy) covers every henchman level.
     const coveredSegments = new Set();
+    let coversAllHenchmen = false;
     for (const p of postings) {
       if (p.status !== "active") continue;
       if (!(game.user.isGM || ownedUuids.includes(p.employerUuid))) continue;
-      if (p.segment) coveredSegments.add(p.segment);
-      const spec = p.spec ?? {};
-      if (!p.segment && spec.level != null && spec.level >= 0) coveredSegments.add(`henchman:${spec.level}`);
+      if (p.segment === "henchman:*") coversAllHenchmen = true;
+      else if (p.segment) coveredSegments.add(p.segment);
     }
     const maskedSegments = new Set(
       postings.filter((p) => p.segment && p.playersSeeDetails === false).map((p) => p.segment)
@@ -192,9 +190,13 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     const playerVisible = (c) => {
       if (game.user.isGM) return true;
       if (c.privateToUuid) return ownedUuids.includes(c.privateToUuid) && ["available", "hired"].includes(c.status);
-      if (visibility === "none") return false;
       if (!["available", "hired"].includes(c.status)) return false;
+      // A replaced candidate is always visible to the recruiter whose
+      // directed search found them (highlighted, month-long).
+      if (c.highlightFor && ownedUuids.includes(c.highlightFor)) return true;
+      if (visibility === "none") return false;
       if (visibility === "all") return true;
+      if (String(c.segment ?? "").startsWith("henchman:") && coversAllHenchmen) return true;
       return coveredSegments.has(c.segment);
     };
 
@@ -233,6 +235,8 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
                 .join(" — "),
           isAggregate: (c.quantity ?? 1) > 1,
           isPrivate: !!c.privateToUuid,
+          // replaced-by-your-search: highlighted for that recruiter (and GM)
+          isHighlighted: !!c.highlightFor && (game.user.isGM || ownedUuids.includes(c.highlightFor)),
           refusalCount: (c.refusals ?? []).length,
           statusLabel: game.i18n.localize(`ACKS-HENCHMEN.candidate.status.${c.status}`),
           isAvailable: c.status === "available",

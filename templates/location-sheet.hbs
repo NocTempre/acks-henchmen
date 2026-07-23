@@ -178,8 +178,8 @@
       </thead>
       <tbody>
         {{#each henchmenRows}}
-        <tr data-candidate-id="{{id}}" class="status-{{status}}">
-          <td data-tooltip="{{appearanceTip}}">{{name}}</td>
+        <tr data-candidate-id="{{id}}" class="status-{{status}}{{#if isHighlighted}} search-hit{{/if}}">
+          <td data-tooltip="{{appearanceTip}}">{{#if isHighlighted}}<i class="fas fa-star" data-tooltip="{{localize 'ACKS-HENCHMEN.candidate.searchHit'}}"></i> {{/if}}{{name}}</td>
           <td>{{age}}</td>
           <td>{{cultureLabel}}</td>
           <td>{{identityLine}}</td>

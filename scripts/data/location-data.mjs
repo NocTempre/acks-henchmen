@@ -40,8 +40,9 @@ function postingField() {
       kind: new fields.StringField({
         required: true,
         initial: "henchman",
-        choices: ["henchman", "henchmanByClass", "henchmanByProficiency", "mercenary", "specialist"],
+        choices: ["henchman", "henchmanByClass", "henchmanByClassProficiency", "henchmanByProficiency", "mercenary", "specialist"],
       }),
+      general: new fields.BooleanField({ initial: false }), // the player-facing "adventuring henchmen" post
       level: num({ integer: true, min: 0, max: 14 }),
       classKey: str(),
       rarityOverride: str(),
@@ -102,6 +103,10 @@ function candidateField() {
     // here first, so the same resolution delivered to several GM sockets
     // (GM in two windows, co-GM) applies exactly once.
     lastResolutionId: str(),
+    // Directed-search replacement (JJ): who this candidate is highlighted
+    // for, and month-long availability (exempt from weekly churn).
+    highlightFor: str(),
+    monthLong: new fields.BooleanField({ initial: false }),
     kind: new fields.StringField({ required: true, initial: "henchman" }),
     quantity: int(1), // >1 only for aggregated troop-scale rows
     level: num({ integer: true }),

@@ -12,30 +12,33 @@
   <div class="form-group">
     <label>{{localize "ACKS-HENCHMEN.posting.kindLabel"}}</label>
     <select name="kind" data-posting-kind>
+      <option value="henchmanGeneral">{{localize "ACKS-HENCHMEN.posting.kind.henchmanGeneral"}}</option>
       {{#if isGM}}
       <option value="henchman">{{localize "ACKS-HENCHMEN.posting.kind.henchman"}}</option>
       {{/if}}
-      <option value="henchmanByClass">{{localize "ACKS-HENCHMEN.posting.kind.henchmanByClass"}}</option>
-      <option value="henchmanByProficiency">{{localize "ACKS-HENCHMEN.posting.kind.henchmanByProficiency"}}</option>
       <option value="mercenary">{{localize "ACKS-HENCHMEN.posting.kind.mercenary"}}</option>
       <option value="specialist">{{localize "ACKS-HENCHMEN.posting.kind.specialist"}}</option>
+      <option value="henchmanByProficiency">{{localize "ACKS-HENCHMEN.posting.kind.henchmanByProficiency"}}</option>
+      <option value="henchmanByClassProficiency">{{localize "ACKS-HENCHMEN.posting.kind.henchmanByClassProficiency"}}</option>
+      <option value="henchmanByClass">{{localize "ACKS-HENCHMEN.posting.kind.henchmanByClass"}}</option>
     </select>
   </div>
   {{#unless isGM}}
   <p class="hint">{{localize "ACKS-HENCHMEN.posting.criteriaHint"}}</p>
   {{/unless}}
 
-  <div class="form-group" data-kind-field="henchman henchmanByClass henchmanByProficiency">
+  <div class="form-group" data-kind-field="henchman henchmanByClass">
     <label>{{localize "ACKS-HENCHMEN.posting.level"}}</label>
     <select name="level">
+      <option value="" data-kind-only="henchmanByClass">{{localize "ACKS-HENCHMEN.posting.anyLevel"}}</option>
       {{#each levels}}
       <option value="{{level}}">{{level}}</option>
       {{/each}}
     </select>
   </div>
-  <p class="hint" data-kind-field="henchmanByClass henchmanByProficiency">{{localize "ACKS-HENCHMEN.posting.classLevelHint"}}</p>
+  <p class="hint" data-kind-field="henchmanByClass">{{localize "ACKS-HENCHMEN.posting.classLevelHint"}}</p>
 
-  <div class="form-group" data-kind-field="henchmanByClass">
+  <div class="form-group" data-kind-field="henchmanByClass henchmanByClassProficiency">
     <label>{{localize "ACKS-HENCHMEN.posting.classKey"}}</label>
     <select name="classKey">
       {{#each classes}}
@@ -44,7 +47,7 @@
     </select>
   </div>
 
-  <div class="form-group" data-kind-field="henchmanByProficiency">
+  <div class="form-group" data-kind-field="henchmanByProficiency henchmanByClassProficiency">
     <label>{{localize "ACKS-HENCHMEN.posting.proficiency"}}</label>
     <input type="text" name="proficiencyName" placeholder="{{localize 'ACKS-HENCHMEN.posting.proficiencyPlaceholder'}}" />
     <select name="proficiencyRanks">
@@ -72,7 +75,7 @@
     </select>
   </div>
 
-  <div class="form-group" data-kind-field="henchmanByClass henchmanByProficiency">
+  <div class="form-group" data-kind-field="henchmanByClass henchmanByClassProficiency henchmanByProficiency">
     <label data-tooltip="{{localize 'ACKS-HENCHMEN.posting.commissionedHint'}}">{{localize "ACKS-HENCHMEN.posting.commissionedLabel"}}</label>
     <input type="checkbox" name="commissioned" />
   </div>
