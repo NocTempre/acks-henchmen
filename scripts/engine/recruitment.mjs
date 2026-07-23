@@ -148,6 +148,10 @@ export function applyDirectedReplacement({ location, spec, employerUuid, quantit
     // month (user model) — a pending future-week arrival that stayed
     // "pending" was invisible and unhirable (found live 2026-07-23).
     c.status = "available";
+    // Directed results are PRIVATE to the recruiter (JJ 118) and live in
+    // the Recruitment tab's directed bucket — not the shared walk-in tabs
+    // (user report 2026-07-23). Employer-less GM posts stay shared.
+    c.privateToUuid = employerUuid ?? "";
     const changesClass = spec.kind === "henchmanByClass" || spec.kind === "henchmanByClassProficiency";
     if (changesClass && spec.classKey) {
       c.classKey = spec.classKey;
@@ -179,7 +183,7 @@ export function applyDirectedReplacement({ location, spec, employerUuid, quantit
  * Build candidate records for one rolled pool.
  * @returns {Promise<object[]>}
  */
-async function buildCandidates({ location, spec, total, marketClass, segment, privateToUuid, monthStart, rarity }) {
+async function buildCandidates({ location, spec, total, marketClass, segment, privateToUuid, monthStart, rarity, notBefore = 0 }) {
   const [w1, w2, w3] = arrivalSplit(total);
   const weeks = [
     { week: 1, count: w1 },
@@ -193,7 +197,12 @@ async function buildCandidates({ location, spec, total, marketClass, segment, pr
 
   for (const { week, count } of weeks) {
     if (count <= 0) continue;
-    const availableFromTime = monthStart + (week - 1) * SECONDS_PER_WEEK;
+    // LATE ROLLS: when the month is rolled after its start (clock jumped,
+    // nobody processed), arrivals schedule from the ROLL time — backdating
+    // them to the month start made whole cohorts expire instantly (one week
+    // of visibility each; user report 2026-07-23). On-time rolls keep the
+    // RAW week 1/2/3 pacing.
+    const availableFromTime = Math.max(monthStart + (week - 1) * SECONDS_PER_WEEK, notBefore + (week - 1) * SECONDS_PER_WEEK);
     const base = {
       segment: segment ?? "",
       privateToUuid: privateToUuid ?? "",
@@ -343,7 +352,7 @@ export function allSegmentSpecs(location) {
  * `anchorTime`.
  * @returns {Promise<{candidates: object[], marketRolls: object[]}>}
  */
-export async function rollMonth(location, anchorTime) {
+export async function rollMonth(location, anchorTime, rollTime = anchorTime) {
   const marketClass = location.system.marketClass; // the town's own stock
   const candidates = [];
   const marketRolls = [];
@@ -362,6 +371,7 @@ export async function rollMonth(location, anchorTime) {
         segment,
         privateToUuid: "",
         monthStart: anchorTime,
+        notBefore: rollTime,
       }))
     );
   }
@@ -610,8 +620,11 @@ export async function processLocation(location, currentTime = now()) {
     } else {
       while (currentTime - monthAnchorTime >= secondsPerMonth()) monthAnchorTime += secondsPerMonth();
     }
-    const month = await rollMonth(location, monthAnchorTime);
-    candidates = [...candidates.filter((c) => c.privateToUuid), ...month.candidates];
+    const month = await rollMonth(location, monthAnchorTime, currentTime);
+    // Replaced directed results (monthLong) belong to the ENDED month and
+    // expire with it; legacy private rows (pre-replacement model) persist
+    // until their posting re-rolls.
+    candidates = [...candidates.filter((c) => c.privateToUuid && !c.monthLong), ...month.candidates];
     marketRolls = month.marketRolls;
     changed = monthRolled = true;
     marketLog = marketLogAppend(
@@ -720,8 +733,12 @@ export async function processLocation(location, currentTime = now()) {
     try {
       const employerDoc = posting.employerUuid ? await fromUuid(posting.employerUuid).catch(() => null) : null;
       const employer = employerDoc?.actor ?? employerDoc;
-      // legacy private candidates (pre-replacement model) purge on re-roll
-      candidates = candidates.filter((c) => c.privateToUuid !== posting.employerUuid);
+      // This recruiter's previous directed results purge on re-roll. The
+      // guard is CRITICAL: an employer-less posting ("" uuid) must never
+      // match the shared pool's empty privateToUuid — that deleted the
+      // whole fresh month (user report 2026-07-23, reproduced live).
+      if (posting.employerUuid) candidates = candidates.filter((c) => c.privateToUuid !== posting.employerUuid);
+      else candidates = candidates.filter((c) => !(c.monthLong && !c.privateToUuid && c.highlightFor === ""));
       const mc = effectiveMarketClass(location, employer);
       // Detached copy; a month-old advert re-rolls AS A COMMISSION (its own
       // rarity shifts one step toward common — the JJ mechanic).
