@@ -144,6 +144,10 @@ export function applyDirectedReplacement({ location, spec, employerUuid, quantit
   const picks = eligible.slice(0, Math.min(quantity, eligible.length));
   const demographics = demographicsOf(location);
   for (const c of picks) {
+    // The search FOUND this person: available immediately and for the whole
+    // month (user model) — a pending future-week arrival that stayed
+    // "pending" was invisible and unhirable (found live 2026-07-23).
+    c.status = "available";
     const changesClass = spec.kind === "henchmanByClass" || spec.kind === "henchmanByClassProficiency";
     if (changesClass && spec.classKey) {
       c.classKey = spec.classKey;

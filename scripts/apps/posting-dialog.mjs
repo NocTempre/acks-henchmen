@@ -7,7 +7,7 @@
  */
 import { MODULE_ID } from "../constants.mjs";
 import { getTable, optTable } from "../rules/tables.mjs";
-import { createPosting } from "../engine/recruitment.mjs";
+import { createPosting, PRIVATE_KINDS } from "../engine/recruitment.mjs";
 import { maxHenchmanLevel } from "../rules/wages.mjs";
 import * as adapter from "../acks-adapter.mjs";
 import { executeAsGM } from "../sockets.mjs";
@@ -182,6 +182,16 @@ export class PostingDialog extends HandlebarsApplicationMixin(ApplicationV2) {
     });
     if (result.error) {
       ui.notifications.error(game.i18n.localize(`ACKS-HENCHMEN.posting.error.${result.error}`));
+      return;
+    }
+    if (result.replaced != null && PRIVATE_KINDS.includes(spec.kind)) {
+      // Directed search: say what the replacement actually did — a success
+      // with no valid targets left silently "finding no one" reads as broken.
+      ui.notifications.info(
+        result.replaced > 0
+          ? game.i18n.format("ACKS-HENCHMEN.posting.replaced", { n: result.replaced, total: result.posting.totalAvailable, fee: result.fee.gp })
+          : game.i18n.format("ACKS-HENCHMEN.posting.replacedNone", { total: result.posting.totalAvailable, fee: result.fee.gp })
+      );
       return;
     }
     ui.notifications.info(

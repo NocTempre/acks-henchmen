@@ -309,6 +309,13 @@ export async function hire(location, candidateId, employer, opts = {}) {
   }
   if (!actor) return { error: "actor-create-denied" };
 
+  // COMMIT the hire on the market FIRST: the actor exists, so the candidate
+  // is taken. Everything after this (grants, roster link, record, loyalty)
+  // is enrichment — a failure there must never leave a phantom "available"
+  // candidate beside a real actor (found live 2026-07-23: an aborted
+  // enrichment step made hiring look broken).
+  await updateCandidate(location, candidateId, { status: "hired" });
+
   // Grant the candidate's proficiency package (JJ 254-257) as real ability
   // items via the lib `ability-provider` contract — the items' effects then
   // feed hiring/loyalty/obedience rolls automatically. 0th henchmen key by
@@ -338,8 +345,10 @@ export async function hire(location, candidateId, employer, opts = {}) {
     console.warn(`${MODULE_ID} | core addHenchman failed; roster link incomplete`, err);
   }
 
-  // 3. Module record.
-  const record = new HenchmanRecord({
+  // 3. Module record (enrichment — non-fatal; see the commit above).
+  let record;
+  try {
+  record = new HenchmanRecord({
     origin: opts.origin ?? "market",
     locationUuid: location.uuid,
     settlementName: location.name,
@@ -390,10 +399,11 @@ export async function hire(location, candidateId, employer, opts = {}) {
     baseLoyaltyBonus: sumEffectModifiers(employer, "baseLoyalty"),
   };
   await adapter.setLoyalty(actor, effectiveLoyalty(record.toObject(), employerMods));
+  } catch (err) {
+    console.error(`${MODULE_ID} | hire enrichment failed for ${actor.name} (record/loyalty incomplete)`, err);
+  }
 
-  // 5. Mark the candidate hired and pay the signing bonus if any.
-  await updateCandidate(location, candidateId, { status: "hired" });
-  // Market ledger (rollback record): who signed with whom, and when.
+  // 5. Market ledger (rollback record): who signed with whom, and when.
   try {
     const log = (location.system.marketLog ?? []).map((l) => l.toObject?.() ?? l);
     const entry = { time: now(), type: "hire", note: `${actor.name} → ${employer.name} (${candidate.wageGp ?? "?"}gp)` };
@@ -410,7 +420,7 @@ export async function hire(location, candidateId, employer, opts = {}) {
     );
   }
 
-  Hooks.callAll(HOOKS.HIRED, { employer, actor, location, record: record.toObject(), candidate });
+  Hooks.callAll(HOOKS.HIRED, { employer, actor, location, record: record?.toObject?.() ?? null, candidate });
   Hooks.callAll(HOOKS.ROSTER_CHANGED, { employer });
   ChatMessage.create({
     content: game.i18n.format("ACKS-HENCHMEN.hire.hiredChat", {
