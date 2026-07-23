@@ -30,7 +30,7 @@ import {
   clampMarketClass,
 } from "../rules/availability.mjs";
 import { parseAvailability } from "../rules/dice.mjs";
-import { rollClassFromDistribution, rollTrajectoryFromDistribution, rollRandomLevel, rollProficiencyLevel } from "../rules/candidates.mjs";
+import { rollClassFromDistribution, rollRandomLevel, rollProficiencyLevel } from "../rules/candidates.mjs";
 import { generateIdentity, classInfo } from "../rules/identity.mjs";
 import { henchmanWage } from "../rules/wages.mjs";
 import { getTable, optTable } from "../rules/tables.mjs";
@@ -149,12 +149,17 @@ export function applyDirectedReplacement({ location, spec, employerUuid, quantit
       c.classKey = spec.classKey;
       c.classRarity = rarity ?? c.classRarity;
       // a new class can mean a new race/culture — the person changes
-      const identity = generateIdentity({ demographics, level: c.level ?? 1, classKey: spec.classKey });
-      c.name = identity.name;
-      c.gender = identity.gender;
-      c.culture = identity.culture;
-      c.age = identity.age;
-      c.appearance = identity.appearance;
+      // (best-effort: missing people tables must not stall processing)
+      try {
+        const identity = generateIdentity({ demographics, level: c.level ?? 1, classKey: spec.classKey });
+        c.name = identity.name;
+        c.gender = identity.gender;
+        c.culture = identity.culture;
+        c.age = identity.age;
+        c.appearance = identity.appearance;
+      } catch (err) {
+        console.warn("acks-henchmen | replacement identity regen failed (people tables missing?)", err);
+      }
     }
     if (spec.kind === "henchmanByProficiency" || spec.kind === "henchmanByClassProficiency") {
       const tag = `${spec.proficiencyName} ×${spec.proficiencyRanks ?? 1}`;
@@ -239,13 +244,10 @@ async function buildCandidates({ location, spec, total, marketClass, segment, pr
           const rolled = await rollClassFromDistribution(rollDice, variant, spec.level);
           candidate.classKey = rolled.classKey;
           candidate.doubleD100 = rolled.rolls;
-        } else {
-          // 0th-level: trajectory bucket from the JJ 247 level-0 weights,
-          // class from the same bucket ladder ("level 0 have classes").
-          const traj = await rollTrajectoryFromDistribution(rollDice, variant);
-          candidate.classKey = traj.classKey;
-          candidate.doubleD100 = traj.rolls;
         }
+        // 0th-level henchmen have NO class (user's market model: classes are
+        // rolled on the double-d100 for level 1-4 ONLY; a 0th prospect rolls
+        // a street OCCUPATION and takes a class when they actually level).
         candidate.wageGp = henchmanWage(spec.level ?? 0);
       } else if (spec.kind === "henchmanByClass") {
         if (!candidate.level || candidate.level <= 0) {
@@ -266,11 +268,8 @@ async function buildCandidates({ location, spec, total, marketClass, segment, pr
           const cls = await rollClassFromDistribution(rollDice, variant, candidate.level);
           candidate.classKey = cls.classKey;
           candidate.doubleD100 = cls.rolls;
-        } else {
-          const traj = await rollTrajectoryFromDistribution(rollDice, variant);
-          candidate.classKey = traj.classKey;
-          candidate.doubleD100 = traj.rolls;
         }
+        // 0th-level proficiency finds stay classless (occupation only).
         candidate.notes = spec.proficiencyName
           ? `${spec.proficiencyName} ×${spec.proficiencyRanks ?? 1}`
           : "";
@@ -298,13 +297,12 @@ async function buildCandidates({ location, spec, total, marketClass, segment, pr
       candidate.appearance = identity.appearance;
       if (identity.hitDice) candidate.hitDice = identity.hitDice;
       if (identity.profCount != null) candidate.profCount = identity.profCount;
-      // Occupation + class trajectory belong ONLY to 0th-level henchman
-      // prospects (JJ 247/254). A specialist's occupation IS their type;
+      // Occupation belongs ONLY to 0th-level henchman prospects (JJ 254);
+      // they carry NO class. A specialist's occupation IS their type;
       // leveled candidates have real classes already.
       const henchKind = ["henchman", "henchmanByClass", "henchmanByProficiency"].includes(spec.kind);
       if (henchKind && (candidate.level ?? 0) === 0) {
         if (!candidate.occupation && identity.occupation) candidate.occupation = identity.occupation;
-        if (!candidate.classKey && identity.classKey) candidate.classKey = identity.classKey;
       }
       candidates.push(candidate);
     }
@@ -621,7 +619,8 @@ export async function processLocation(location, currentTime = now()) {
   }
   // Optional RAW slavery (JJ 409): each fresh market month, remind the GM
   // what the slave market offers. Gated by setting + imported tables.
-  if (monthRolled) await postSlaveMarketCard(location);
+  // Best-effort: a card failure must never stall market processing.
+  if (monthRolled) await postSlaveMarketCard(location).catch((err) => console.warn(`${MODULE_ID} | slave-market card failed`, err));
   // Keep active generic postings' info in sync with the current month.
   for (const posting of postings) {
     if (posting.status !== "active" || !posting.segment) continue;
@@ -678,18 +677,24 @@ export async function processLocation(location, currentTime = now()) {
   }
 
   // 2. Weekly fees per active posting (fee per week per type searched —
-  // each posting pays its own ROLLED fee every week it runs).
+  // each posting pays its own ROLLED fee every week it runs). Per-posting
+  // try/catch: one unpayable employer (deleted actor, permission on a
+  // player-run pass) must never stall the whole board.
   for (const posting of postings) {
     if (posting.status !== "active") continue;
-    const employerDoc = posting.employerUuid ? await fromUuid(posting.employerUuid).catch(() => null) : null;
-    const employer = employerDoc?.actor ?? employerDoc;
-    const weeksElapsed = Math.floor((currentTime - posting.createdTime) / SECONDS_PER_WEEK) + 1;
-    const feesPaid = posting.feesPaid.length;
-    for (let w = feesPaid; w < weeksElapsed; w++) {
-      const fee = await chargeWeeklyFee(location, employer, w + 1);
-      posting.feesPaid.push({ time: currentTime, gp: fee.gp });
-      ledger.push({ time: currentTime, gp: fee.gp, postingId: posting.id, paidByUuid: posting.employerUuid });
-      changed = true;
+    try {
+      const employerDoc = posting.employerUuid ? await fromUuid(posting.employerUuid).catch(() => null) : null;
+      const employer = employerDoc?.actor ?? employerDoc;
+      const weeksElapsed = Math.floor((currentTime - posting.createdTime) / SECONDS_PER_WEEK) + 1;
+      const feesPaid = posting.feesPaid.length;
+      for (let w = feesPaid; w < weeksElapsed; w++) {
+        const fee = await chargeWeeklyFee(location, employer, w + 1);
+        posting.feesPaid.push({ time: currentTime, gp: fee.gp });
+        ledger.push({ time: currentTime, gp: fee.gp, postingId: posting.id, paidByUuid: posting.employerUuid });
+        changed = true;
+      }
+    } catch (err) {
+      console.warn(`${MODULE_ID} | weekly fee failed for posting ${posting.id}`, err);
     }
     posting.lastProcessedTime = currentTime;
   }
@@ -708,36 +713,40 @@ export async function processLocation(location, currentTime = now()) {
       specSpecificity(b.spec.toObject?.() ?? b.spec) - specSpecificity(a.spec.toObject?.() ?? a.spec) || Math.random() - 0.5
   );
   for (const posting of duePrivates) {
-    const employerDoc = posting.employerUuid ? await fromUuid(posting.employerUuid).catch(() => null) : null;
-    const employer = employerDoc?.actor ?? employerDoc;
-    // legacy private candidates (pre-replacement model) purge on re-roll
-    candidates = candidates.filter((c) => c.privateToUuid !== posting.employerUuid);
-    const mc = effectiveMarketClass(location, employer);
-    // Detached copy; a month-old advert re-rolls AS A COMMISSION (its own
-    // rarity shifts one step toward common — the JJ mechanic).
-    const spec = { ...(posting.spec.toObject?.() ?? posting.spec) };
-    if (posting.advertVeteran) spec.commissioned = true;
-    const result = await rollMonthlyPool(spec, mc, rollDice, Math.random, sys.classRarityTableId || "default");
-    if (!result.error) {
-      posting.totalAvailable = result.quantity;
-      posting.rollDetail = result.detail;
-      posting.monthStartTime = currentTime;
-      const n = applyDirectedReplacement({
-        location,
-        spec,
-        employerUuid: posting.employerUuid,
-        quantity: result.quantity,
-        rarity: result.rarity,
-        candidates,
-      });
-      marketLog = marketLogAppend(
-        marketLog,
-        currentTime,
-        "replace",
-        `${result.detail || spec.kind}: ${n} of ${result.quantity} rolled replaced for ${employer?.name ?? "?"}`
-      );
+    try {
+      const employerDoc = posting.employerUuid ? await fromUuid(posting.employerUuid).catch(() => null) : null;
+      const employer = employerDoc?.actor ?? employerDoc;
+      // legacy private candidates (pre-replacement model) purge on re-roll
+      candidates = candidates.filter((c) => c.privateToUuid !== posting.employerUuid);
+      const mc = effectiveMarketClass(location, employer);
+      // Detached copy; a month-old advert re-rolls AS A COMMISSION (its own
+      // rarity shifts one step toward common — the JJ mechanic).
+      const spec = { ...(posting.spec.toObject?.() ?? posting.spec) };
+      if (posting.advertVeteran) spec.commissioned = true;
+      const result = await rollMonthlyPool(spec, mc, rollDice, Math.random, sys.classRarityTableId || "default");
+      if (!result.error) {
+        posting.totalAvailable = result.quantity;
+        posting.rollDetail = result.detail;
+        posting.monthStartTime = currentTime;
+        const n = applyDirectedReplacement({
+          location,
+          spec,
+          employerUuid: posting.employerUuid,
+          quantity: result.quantity,
+          rarity: result.rarity,
+          candidates,
+        });
+        marketLog = marketLogAppend(
+          marketLog,
+          currentTime,
+          "replace",
+          `${result.detail || spec.kind}: ${n} of ${result.quantity} rolled replaced for ${employer?.name ?? "?"}`
+        );
+      }
+      changed = true;
+    } catch (err) {
+      console.warn(`${MODULE_ID} | directed re-roll failed for posting ${posting.id}`, err);
     }
-    changed = true;
   }
 
   // (Shared-segment rollover is handled by the month anchor in step 0 —

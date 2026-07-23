@@ -545,5 +545,8 @@
   "ACKS-HENCHMEN.posting.kind.henchmanGeneral": "Adventuring henchmen (general)",
   "ACKS-HENCHMEN.posting.kind.henchmanByClassProficiency": "Recruit: by class proficiency",
   "ACKS-HENCHMEN.posting.anyLevel": "any (by class)",
-  "ACKS-HENCHMEN.candidate.searchHit": "Found by your directed search — available all month."
+  "ACKS-HENCHMEN.candidate.searchHit": "Found by your directed search — available all month.",
+  "ACKS-HENCHMEN.location.marketWeek": "Market week",
+  "ACKS-HENCHMEN.location.marketWeekHint": "Week of the current market month. Arrivals land in weeks 1-3; late weeks are quiet by the book until the next monthly roll.",
+  "ACKS-HENCHMEN.location.nextRoll": "next roll in"
 }

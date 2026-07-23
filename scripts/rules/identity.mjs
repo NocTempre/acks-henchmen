@@ -255,38 +255,18 @@ export function generateOccupation(rand, race = "human") {
     const caste = castes ? rollDwarvenCaste(rand, castes) : null;
     if (caste) return { category: "caste", occupation: caste };
   }
-  const table = optTable("people", "occupations");
-  if (!table) {
-    const raw = generateOccupationRaw(rand);
-    if (raw) return raw;
-    // The category table (JJ 252) is not imported yet; draw uniformly from
-    // the harvested occupation packages so 0th candidates still get a trade
-    // and a proficiency grant. Category WEIGHTS arrive with that table.
-    const packs = optTable("people", "occupationPackages");
-    const keys = packs ? Object.keys(packs).filter((k) => !k.startsWith("_")) : [];
-    if (!keys.length) return { category: "", occupation: "" };
-    const k = keys[Math.floor(rand() * keys.length)];
-    const label = packs._labels?.[k] ?? k;
-    return { category: "", occupation: label.replace(/\b\w/g, (c) => c.toUpperCase()) };
-  }
-  const raceTable = table.byRace?.[race];
-  if (raceTable) {
-    const category = pickWeighted(rand, raceTable.categories, (c) => c.weight);
-    const occupation = category.entries.length
-      ? `${category.label}: ${pick(rand, category.entries)}`
-      : category.label;
-    return { category: category.id, occupation };
-  }
-  const category = pickWeighted(rand, table.categories, (c) => c.weight);
-  return { category: category.id, occupation: pick(rand, category.entries) };
-}
-
-/** Class trajectory from the JJ 247 percentage table (level 0 row included). */
-export function generateTrajectoryClass(rand, level) {
-  const rows = getTable("people", "classPercentages").rows;
-  const row = rows.find((r) => level >= r.minLevel && level <= r.maxLevel) ?? rows[0];
-  const entries = Object.entries(row.weights);
-  return pickWeighted(rand, entries, ([, w]) => w)[0];
+  // The RAW occupant system (street column + sub-tables) is the primary
+  // path; the uniform package draw is the degraded fallback while those
+  // tables are not imported. (The pre-purge `people.occupations` category
+  // table is retired — orphaned by the content migration.)
+  const raw = generateOccupationRaw(rand);
+  if (raw) return raw;
+  const packs = optTable("people", "occupationPackages");
+  const keys = packs ? Object.keys(packs).filter((k) => !k.startsWith("_")) : [];
+  if (!keys.length) return { category: "", occupation: "" };
+  const k = keys[Math.floor(rand() * keys.length)];
+  const label = packs._labels?.[k] ?? k;
+  return { category: "", occupation: label.replace(/\b\w/g, (c) => c.toUpperCase()) };
 }
 
 /**

@@ -202,3 +202,25 @@ export const THROWS_DATA = {
     },
   },
 };
+
+/**
+ * Alignment-openness AUTOMATION (module inference, not a printed table):
+ * recruiting a class openly where its alignment is unwelcome shifts the
+ * directed-search rarity one step (chaotic warlocks in a lawful town). The
+ * step is this module's own judgment call layered under any world import
+ * (partial doc at SAMPLE priority; per-table registry layering keeps the
+ * imported rarity tables above it).
+ */
+export const RARITY_AUTOMATION = {
+  id: "rarity",
+  source: { note: "Module automation config (alignment-openness inference; not book data)." },
+  tables: {
+    alignmentRecruitment: {
+      shifts: {
+        lawful: { chaotic: 1 },
+        neutral: {},
+        chaotic: { lawful: 1 },
+      },
+    },
+  },
+};

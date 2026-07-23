@@ -12,7 +12,7 @@ import { installWageGuard, registerDeletionCleanup, sweepAtReady, repairWorld, r
 import * as config from "./config.mjs";
 import { registerSettings, getSetting } from "./settings.mjs";
 import { getTable, getDoc, hasDoc, initTables } from "./rules/tables.mjs";
-import { THROWS_DATA } from "./data/throws-data.mjs";
+import { THROWS_DATA, RARITY_AUTOMATION } from "./data/throws-data.mjs";
 import * as availabilityRules from "./rules/availability.mjs";
 import * as wageRules from "./rules/wages.mjs";
 import * as loyaltyRules from "./rules/loyalty.mjs";
@@ -91,6 +91,7 @@ Hooks.once("setup", async () => {
   if (globalThis.acksLib?.tables) {
     try {
       initTables(THROWS_DATA);
+      initTables(RARITY_AUTOMATION); // partial doc: per-table layering keeps imports above
     } catch (err) {
       console.error(`${MODULE_ID} | failed to register throws automation`, err);
     }
@@ -102,6 +103,7 @@ Hooks.once("setup", async () => {
       globalThis.acksLib.tables.expectTables?.("wages", ["henchmanWageByLevel", "signingBonus", "mercenaryWages"]);
       globalThis.acksLib.tables.expectTables?.("people", ["cultures", "classPercentages", "occupationTypes", "occupationSubTables", "occupationPackages", "ageByClass", "proficienciesByAge", "hd0", "dwarvenCastes"]);
       globalThis.acksLib.tables.expectTables?.("slavery", ["commonSlaves", "slaveTroopCosts", "soldierRules"]);
+      globalThis.acksLib.tables.expectTables?.("settlement", ["marketClassByFamilies"]);
     } catch (err) {
       console.warn(`${MODULE_ID} | expectTables failed`, err);
     }

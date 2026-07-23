@@ -91,9 +91,10 @@ export async function rollTrajectoryFromDistribution(rollDice, variant = "defaul
  */
 export async function rollRandomLevel(rollDice, marketClass) {
   const table = getTable("rarity", "randomHenchmanLevel");
-  // classVIPenalty is a book value not yet importable (JJ 118 prose) — no
-  // penalty until it lands, never a hardcoded stand-in.
-  const penalty = marketClass === 6 ? (table.classVIPenalty ?? 0) : 0;
+  // Class VI penalty comes from the imported JJ 119 prose values (sqm doc);
+  // absent that import there is no penalty — never a hardcoded stand-in.
+  const imported = optTable("rarity", "specificQualificationMods")?.gpClassVIPenalty;
+  const penalty = marketClass === 6 ? (table.classVIPenalty ?? imported ?? 0) : 0;
   const die = await rollDice("1d20");
   const total = die + penalty;
   const row =
@@ -103,12 +104,15 @@ export async function rollRandomLevel(rollDice, marketClass) {
 }
 
 /**
- * General-proficiency searches (JJ 119): 1d4 — on 1-3 the henchman is 0th
- * level, on 4 roll the Random Henchman Level table.
+ * General-proficiency searches (JJ 119): the imported level die (1d4) — in
+ * the printed zero band the henchman is 0th level, above it roll the Random
+ * Henchman Level table. Die/band come from the sqm import.
  */
 export async function rollProficiencyLevel(rollDice, marketClass) {
-  const d4 = await rollDice("1d4");
-  if (d4 <= 3) return { level: 0, die: d4, penalty: 0 };
+  const sqm = optTable("rarity", "specificQualificationMods");
+  const die = await rollDice(sqm?.gpLevelDie ?? "1d4");
+  const [zMin, zMax] = sqm?.gpZeroBand ?? [1, 3];
+  if (die >= zMin && die <= zMax) return { level: 0, die, penalty: 0 };
   return rollRandomLevel(rollDice, marketClass);
 }
 

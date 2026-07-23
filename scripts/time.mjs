@@ -90,6 +90,26 @@ export function sameMarketMonth(t0, t1) {
   return Math.floor(t0 / secondsPerMonth()) === Math.floor(t1 / secondsPerMonth());
 }
 
+/**
+ * When the NEXT market month begins (the next whole-market roll), given the
+ * current anchor. Calendar worlds: the next calendar month's first second
+ * (variable month lengths probed day by day); day-counted: anchor + month.
+ */
+export function nextMarketRollTime(monthAnchorTime, t = now()) {
+  const key = calendarMonthKey(t);
+  if (key != null) {
+    const spd = SECONDS_PER_DAY;
+    let probe = t;
+    for (let i = 0; i < 64; i++) {
+      probe += spd;
+      if (calendarMonthKey(probe) !== key) return calendarMonthStart(probe) ?? probe;
+    }
+    return null;
+  }
+  if (!monthAnchorTime) return null;
+  return monthAnchorTime + secondsPerMonth();
+}
+
 export function daysBetween(t0, t1) {
   return Math.floor((t1 - t0) / SECONDS_PER_DAY);
 }

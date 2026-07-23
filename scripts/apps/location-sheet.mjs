@@ -15,7 +15,7 @@ import { executeAsGM } from "../sockets.mjs";
 import { addSpecialHire, updateSpecialHire } from "../engine/hire.mjs";
 import { openPostingDialog } from "./posting-dialog.mjs";
 import { openRecruitDialog, openRecruitSpecial } from "./recruit-dialog.mjs";
-import { now, advanceDays } from "../time.mjs";
+import { now, advanceDays, nextMarketRollTime } from "../time.mjs";
 
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 const { ActorSheetV2 } = foundry.applications.sheets;
@@ -98,6 +98,13 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     // Owners may run due processing (idempotent) so arrivals reveal
     // without waiting on a GM click; the clock itself is the GM's.
     context.canProcess = game.user.isGM || actor.testUserPermission(game.user, "OWNER");
+    // "Not stuck" visibility: current market week + when the next whole-
+    // market roll lands (a late-month board is quiet by RAW, not stalled).
+    if (sys.monthAnchorTime) {
+      context.marketWeek = Math.max(1, Math.floor((t - sys.monthAnchorTime) / SECONDS_PER_WEEK) + 1);
+      const next = nextMarketRollTime(sys.monthAnchorTime, t);
+      context.nextRollDays = next ? Math.max(0, Math.ceil((next - t) / SECONDS_PER_DAY)) : null;
+    }
     context.marketClass = sys.marketClass;
     context.marketClassRoman = ["I", "II", "III", "IV", "V", "VI"][sys.marketClass - 1];
     context.searchFeeFormula = (() => {
@@ -133,7 +140,7 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     context.market = (sys.marketRolls ?? []).map((r) => {
       const roll = r.toObject?.() ?? r;
       const mine = candidates.filter((c) => c.segment === roll.segment);
-      const week = Math.min(4, Math.floor((t - roll.monthStartTime) / SECONDS_PER_WEEK) + 1);
+      const week = Math.max(1, Math.floor((t - roll.monthStartTime) / SECONDS_PER_WEEK) + 1);
       return {
         ...roll,
         label: this.#segmentLabel(roll.segment),

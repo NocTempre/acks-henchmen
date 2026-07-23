@@ -12,6 +12,11 @@
           {{localize "ACKS-HENCHMEN.location.searchFee"}}: <strong>{{searchFeeFormula}}</strong> gp/{{localize "ACKS-HENCHMEN.location.perWeek"}}
         </span>
         {{/if}}
+        {{#if marketWeek}}
+        <span class="market-class-badge" data-tooltip="{{localize 'ACKS-HENCHMEN.location.marketWeekHint'}}">
+          {{localize "ACKS-HENCHMEN.location.marketWeek"}} <strong>{{marketWeek}}</strong>{{#if nextRollDays}} · {{localize "ACKS-HENCHMEN.location.nextRoll"}} {{nextRollDays}}d{{/if}}
+        </span>
+        {{/if}}
         {{#if canProcess}}
         <button type="button" data-action="processNow" data-tooltip="{{localize 'ACKS-HENCHMEN.location.processNowHint'}}">
           <i class="fas fa-rotate"></i> {{localize "ACKS-HENCHMEN.location.processNow"}}
