@@ -41,14 +41,17 @@ function officerMoraleModifier(specialistType) {
   return /^(marshal|marinerMaster)/i.test(specialistType ?? "") ? 1 : 0;
 }
 
-/** The officer's level — the RR 171 table value for a mercOfficer, else the actor's. */
-function officerLevelFor(specialistType, officerActor) {
+/** The COMMAND level for RR 169 capacity: a hired mercOfficer's RR 171 rank if
+ *  present (lieutenant 4 … general 10), else the employer's level — the employer
+ *  personally leads. A marshal trains and lifts morale but does not field-command,
+ *  so it never sets this. */
+function commandLevel(specialistType, employer) {
   const title = officerTitle(specialistType);
   if (title) {
     const row = (optTable("wages", "mercenaryOfficers")?.rows ?? []).find((r) => r.title === title);
     if (row?.level) return row.level;
   }
-  return Number(officerActor?.system?.details?.level ?? 0) || 0;
+  return Number(employer?.system?.details?.level ?? 0) || 0;
 }
 
 /** acks scores block from a candidate's rolled attributes (acks stores WIS as `.wil`). */
@@ -109,6 +112,9 @@ async function findOrCreateGroup(employer, location) {
       "system.unit.category": "mercenary",
       "system.unit.employerUuid": employer.uuid,
       "system.unit.locationUuid": location?.uuid ?? "",
+      // Default field commander is the employer personally; a hired mercOfficer
+      // overrides this with its higher rank.
+      "system.unit.officerLevel": Number(employer.system?.details?.level ?? 0) || 0,
     });
   }
   return group;
@@ -168,7 +174,7 @@ export async function hireAsGroup(location, employer, { troops = [], officerCand
       await group.update({
         "system.unit.officerUuid": officer.uuid,
         "system.unit.officerMoraleBonus": Math.max(0, officerMoraleModifier(specialistType)),
-        "system.unit.officerLevel": officerLevelFor(specialistType, officer),
+        "system.unit.officerLevel": commandLevel(specialistType, employer),
       });
     }
   }
