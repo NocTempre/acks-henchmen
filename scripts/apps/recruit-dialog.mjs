@@ -27,7 +27,7 @@ function hasBribery(employer) {
 
 /** Resolve which character is attempting the recruitment. Players offer on
  *  behalf of characters they OWN; GMs may pick any PC. */
-async function pickEmployer(preferred) {
+export async function pickEmployer(preferred) {
   if (preferred) return preferred;
   if (game.user.character) return game.user.character;
   const choices = game.actors.filter(

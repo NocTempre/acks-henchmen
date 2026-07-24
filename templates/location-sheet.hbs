@@ -210,6 +210,11 @@
 
   {{!-- ------------------------- Mercenaries ------------------------- --}}
   <section class="tab location-tab {{tabs.mercenaries.cssClass}}" data-group="primary" data-tab="mercenaries">
+    <div class="bucket-actions">
+      <button type="button" data-action="hireGroup" data-tooltip="{{localize 'ACKS-HENCHMEN.group.hireHint'}}">
+        <i class="fas fa-flag"></i> {{localize "ACKS-HENCHMEN.group.hireAsGroup"}}
+      </button>
+    </div>
     {{#if mercenaryRows.length}}
     <table class="candidates-table">
       <thead>

@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.20.0
+
+- **Hire a whole unit from the market as one group.** A new "Hire as Group"
+  action on the location's Mercenaries tab assembles the available market into a
+  single `acks-lib.group` owned by the employer: each troop row becomes a counted
+  merc **stack** (per-body HP and casualties, no `retainer.quantity` label and no
+  actor-per-body — a platoon of 30 is one prototype + one stack of 30), and an
+  optional officer (the `mercOfficer*` / `marshal*` leader specialists) is hired
+  as a lone leveled actor and linked as the group's commander (RR 171). The
+  dialog lets the hirer pick troops with quantities and an officer; utility
+  specialists and individual henchmen still hire as lone actors. Engine:
+  `engine/hire-group.mjs` (`hireAsGroup`); UI: `apps/hire-group-dialog.mjs`.
+- Requires acks-lib >= 0.22.0 (the group actor + its officer troops-addendum).
+
 ## 0.19.5
 
 - **Generic actor reads consumed from acks-lib.** `getChaMod`, `getLevel` and

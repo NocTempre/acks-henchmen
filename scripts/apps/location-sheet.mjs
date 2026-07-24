@@ -15,6 +15,7 @@ import { executeAsGM } from "../sockets.mjs";
 import { addSpecialHire, updateSpecialHire } from "../engine/hire.mjs";
 import { openPostingDialog } from "./posting-dialog.mjs";
 import { openRecruitDialog, openRecruitSpecial } from "./recruit-dialog.mjs";
+import { openHireGroupDialog } from "./hire-group-dialog.mjs";
 import { now, advanceDays, nextMarketRollTime } from "../time.mjs";
 
 const { HandlebarsApplicationMixin } = foundry.applications.api;
@@ -33,6 +34,7 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
       closePosting: LocationSheet.#onClosePosting,
       togglePlayerDetails: LocationSheet.#onTogglePlayerDetails,
       recruit: LocationSheet.#onRecruit,
+      hireGroup: LocationSheet.#onHireGroup,
       recruitSpecial: LocationSheet.#onRecruitSpecial,
       removeSpecial: LocationSheet.#onRemoveSpecial,
       setSpecialLimit: LocationSheet.#onSetSpecialLimit,
@@ -439,6 +441,11 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
   static async #onRecruit(_event, target) {
     const candidate = this.#candidate(target);
     if (candidate) openRecruitDialog(this.actor, candidate.id);
+  }
+
+  /** Assemble available troops + an officer into one acks-lib.group. */
+  static async #onHireGroup() {
+    await openHireGroupDialog(this.actor);
   }
 
   /** GM drag-drop: register a dropped actor as a special hire. */
