@@ -14,13 +14,12 @@
  */
 import { marketClassFromFamilies, clampMarketClass } from "../rules/availability.mjs";
 import { acksCompatStubs } from "../../../acks-lib/scripts/actor-compat.mjs";
+// num/str/int are the family's leaf field-builders — one definition in acks-lib
+// (this file and henchman-record.mjs each had a verbatim copy). `fields` is
+// still needed locally for the non-leaf types (SchemaField, ArrayField, HTMLField).
+import { num, str, int } from "../../../acks-lib/scripts/fields.mjs";
 
 const fields = foundry.data.fields;
-
-const num = (opts = {}) => new fields.NumberField({ required: false, nullable: true, initial: null, ...opts });
-const int = (initial = 0, opts = {}) =>
-  new fields.NumberField({ required: true, nullable: false, integer: true, initial, ...opts });
-const str = (opts = {}) => new fields.StringField({ required: false, blank: true, initial: "", ...opts });
 
 /**
  * One recruitment posting — a recruiter's PAID SEARCH (fee per week per

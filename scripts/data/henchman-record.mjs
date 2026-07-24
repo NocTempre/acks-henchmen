@@ -9,12 +9,11 @@
  * and the event log.
  */
 import { MODULE_ID, FLAG_RECORD } from "../constants.mjs";
+// Leaf field-builders shared from acks-lib (were a verbatim copy here and in
+// location-data.mjs). `fields` stays for the composite types below.
+import { num, str, int } from "../../../acks-lib/scripts/fields.mjs";
 
 const fields = foundry.data.fields;
-
-const num = (opts = {}) => new fields.NumberField({ required: false, nullable: true, initial: null, ...opts });
-const int = (initial = 0) => new fields.NumberField({ required: true, nullable: false, integer: true, initial });
-const str = (opts = {}) => new fields.StringField({ required: false, blank: true, initial: "", ...opts });
 
 function ledgerEntry() {
   return new fields.SchemaField({

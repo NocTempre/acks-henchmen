@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.19.4
+
+- **Leaf field-builders consumed from acks-lib.** `num`/`str`/`int` were defined
+  identically in both `location-data.mjs` and `henchman-record.mjs`; both now
+  import them from acks-lib's `fields.mjs`. Behaviour-neutral. (`choicesOf` was
+  left local — henchmen's enums are flat `{key: label}`, a different shape from
+  acks-lib's labeled enums, so the two are not interchangeable.)
+
 ## 0.19.3
 
 - **LocationData consumes acks-lib's shared compat stub.** The settlement
