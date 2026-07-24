@@ -10,12 +10,15 @@
  */
 import { MODULE_ID, FLAG_RETAIN_BONUS } from "./constants.mjs";
 import { sumEffectModifiers } from "./effects.mjs";
+// The generic actor reads (ability mod, class level, HD parse) live once in
+// acks-lib — acks-influence read the same schema. `monsterHd`'s union also picks
+// up the "1/2"-HD form this module's own parser missed. Henchman-specific reads
+// (retainer, henchmenList, gold) stay here.
+import { abilityMod, classLevel, monsterHd } from "../../acks-lib/scripts/actor-read.mjs";
 
 /* ------------------------------ reads ------------------------------ */
 
-export function getChaMod(actor) {
-  return Number(actor?.system?.scores?.cha?.mod ?? 0);
-}
+export const getChaMod = (actor) => abilityMod(actor, "cha");
 
 /** Core derives cha.loyalty = cha.mod (actor.mjs:1027) but never uses it. */
 export function getChaLoyalty(actor) {
@@ -34,9 +37,7 @@ export function getRetainMax(actor) {
   return getRetainBase(actor) + sumEffectModifiers(actor, "retainBonus") + (Number.isFinite(manual) ? manual : 0);
 }
 
-export function getLevel(actor) {
-  return Number(actor?.system?.details?.level ?? 0);
-}
+export const getLevel = classLevel;
 
 export function getMorale(actor) {
   return Number(actor?.system?.details?.morale ?? 0);
@@ -72,13 +73,8 @@ export function getHenchmenIds(actor) {
   return Array.isArray(actor?.system?.henchmenList) ? [...actor.system.henchmenList] : [];
 }
 
-/** Parse a monster's HD rating from `system.hp.hd` (e.g. "3d8+1" → 3). */
-export function getMonsterHd(actor) {
-  const hd = actor?.system?.hp?.hd;
-  if (typeof hd === "number") return hd;
-  const m = String(hd ?? "").match(/^\s*(\d+(?:\.\d+)?)/);
-  return m ? parseFloat(m[1]) : 0;
-}
+/** A monster's HD rating from `system.hp.hd` — acks-lib's union parser. */
+export const getMonsterHd = monsterHd;
 
 /**
  * "Level" for wage purposes: class level for characters, HD for monsters

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.19.5
+
+- **Generic actor reads consumed from acks-lib.** `getChaMod`, `getLevel` and
+  `getMonsterHd` are now thin re-exports of acks-lib's `abilityMod` /
+  `classLevel` / `monsterHd` (acks-influence read the same schema). The
+  henchman-specific reads (retainer, henchmen list, gold) stay local. Side
+  benefit: the shared `monsterHd` union parses `"1/2"`-HD monsters as 0.5, which
+  this module's own parser had read as 0 — so ½-HD hirelings now get the right
+  wage level.
+
 ## 0.19.4
 
 - **Leaf field-builders consumed from acks-lib.** `num`/`str`/`int` were defined
