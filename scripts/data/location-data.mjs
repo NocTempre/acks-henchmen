@@ -13,6 +13,7 @@
  * hundreds of 0th-level candidates; a real Actor is created only on hire.
  */
 import { marketClassFromFamilies, clampMarketClass } from "../rules/availability.mjs";
+import { acksCompatStubs } from "../../../acks-lib/scripts/actor-compat.mjs";
 
 const fields = foundry.data.fields;
 
@@ -151,31 +152,12 @@ export class LocationData extends foundry.abstract.TypeDataModel {
     return {
       // --- acks system compatibility stubs -------------------------------
       // AcksActor.prepareDerivedData runs for EVERY actor type and touches
-      // these fields unconditionally (computeAAB: thac0.bba = 10 - thac0.throw;
-      // computeAdditionnalData: initiative.value, movement.encounter). All
-      // other core compute functions guard on type === "character". Without
-      // the stubs every location update logs a failed-data-preparation error.
-      // Values are meaningless for a settlement; the writes stay in memory.
-      thac0: new fields.SchemaField({
-        throw: int(10),
-        bba: int(0),
-      }),
-      initiative: new fields.SchemaField({
-        value: int(0),
-        mod: int(0),
-      }),
-      movement: new fields.SchemaField({
-        base: int(0),
-        encounter: int(0),
-      }),
-      // The system's setup-hook migration (updateWeightsLanguages) calls
-      // actor.updateImplements() on EVERY actor, reading
-      // system.saves.implements/.wand unguarded. Value 0 (≠ -1) makes the
-      // migration a no-op for locations.
-      saves: new fields.SchemaField({
-        wand: new fields.SchemaField({ value: int(0) }),
-        implements: new fields.SchemaField({ value: int(0) }),
-      }),
+      // isNew / thac0 / initiative / movement / saves.implements|wand
+      // unguarded; without them every location update logs a failed-data-
+      // preparation error. ONE definition of that set now lives in acks-lib
+      // (its setup sweep reads these world-wide, so it is a family concern, not
+      // a per-module one). Values are meaningless for a settlement.
+      ...acksCompatStubs(),
       // --- location data -------------------------------------------------
       region: str(),
       notes: new fields.HTMLField({ required: false, blank: true, initial: "" }),

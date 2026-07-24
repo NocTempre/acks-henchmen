@@ -1,6 +1,14 @@
 # Changelog
 
-## Unreleased
+## 0.19.3
+
+- **LocationData consumes acks-lib's shared compat stub.** The settlement
+  sub-type's inline system-compatibility block (thac0 / initiative / movement /
+  saves.implements|wand) is replaced by a spread of `acksCompatStubs()` from
+  acks-lib — one definition of the fields the acks system touches on every
+  actor, instead of a per-module copy. Loss-free and behaviour-neutral (verified
+  live: a location constructs cleanly and its own fields survive); it also gains
+  `isNew`, which the location previously dropped silently.
 
 - Slander registry: entries now carry a structured `subject {scope, uuid}`
   ("all" | "party" | "character") instead of a bare party key, so one
