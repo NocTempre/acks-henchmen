@@ -458,3 +458,72 @@
 .acks-henchmen.location-sheet tr.search-hit .fa-star {
   color: #c9a227;
 }
+
+/* --- Hire-as-Group dialog: capped stepper grid + officer dropdown ---
+   Every rule is rooted at .acks-henchmen-hire-group so the child classes ride
+   as descendants (validate only namespaces the FIRST class on a line). */
+.acks-henchmen-hire-group .hg-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  gap: 0.4rem;
+  margin-top: 0.25rem;
+}
+.acks-henchmen-hire-group .hg-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.35rem 0.4rem;
+  border: 1px solid var(--color-border-light-tertiary, #b5b3a4);
+  border-radius: 4px;
+}
+.acks-henchmen-hire-group .hg-name {
+  font-weight: bold;
+  font-size: 0.82rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.acks-henchmen-hire-group .hg-stepper {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+.acks-henchmen-hire-group .hg-stepper input[type="number"] {
+  width: 3rem;
+  text-align: center;
+  -moz-appearance: textfield;
+}
+.acks-henchmen-hire-group .hg-stepper input[type="number"]::-webkit-outer-spin-button,
+.acks-henchmen-hire-group .hg-stepper input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.acks-henchmen-hire-group .hg-step {
+  flex: 0 0 1.6rem;
+  width: 1.6rem;
+  height: 1.7rem;
+  line-height: 1;
+  padding: 0;
+  font-size: 1.1rem;
+  font-weight: bold;
+  cursor: pointer;
+}
+.acks-henchmen-hire-group .hg-max {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 0;
+  width: auto;
+  cursor: pointer;
+  font-size: 0.72rem;
+  color: var(--color-text-hyperlink, #1c60a5);
+}
+.acks-henchmen-hire-group .hg-officer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-top: 0.6rem;
+}
+.acks-henchmen-hire-group .hg-officer select {
+  width: 100%;
+}

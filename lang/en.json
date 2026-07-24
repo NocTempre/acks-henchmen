@@ -360,6 +360,8 @@
   "ACKS-HENCHMEN.group.hiredChat": "<strong>{employer}</strong> musters <strong>{group}</strong> — {stacks} troop stack(s), {total} strong.",
   "ACKS-HENCHMEN.group.hiredInfo": "Hired into {group} ({stacks} stack(s)).",
   "ACKS-HENCHMEN.group.hireFailed": "Could not hire as a group ({reason}).",
+  "ACKS-HENCHMEN.group.ofAvailable": "/ {n}",
+  "ACKS-HENCHMEN.group.takeAll": "Take all available",
   "ACKS-HENCHMEN.group.noEmployer": "No employer available to hire for.",
   "ACKS-HENCHMEN.group.noneAvailable": "No troops or officers are available in the market to form a group.",
   "ACKS-HENCHMEN.group.overCommand": "This unit ({strength} infantry-equivalents) is larger than its officer can personally lead (RR 169 limit {cap}). Hire a higher-rank officer, or split it — a force of several platoons is an army (acks-troops), not a skirmish unit.",
