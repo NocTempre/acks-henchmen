@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.22.0
+
+- **A hired group is a PAID unit that costs no henchman-cap slot.** The wage
+  cycle now bills the employer's `acks-lib.group` units alongside its henchmen:
+  the unit's monthly wage is every living body's troop wage (RR 168, read from
+  each stack's troop type), gold leaves the employer at each payday, and the
+  group is billed off `unit.employerUuid` — never added to the core
+  `henchmenList`, so it never counts against the PC henchman cap and never
+  touches acks-core. A missed month accrues arrears on the group and drops its
+  morale (RR 166). Pay state lives in a `flags.acks-henchmen.groupPay` flag on
+  the group; the "wages due" reminder now surfaces employers who owe a unit.
+- **Roll Unit Morale** — a right-click context action on a group actor opens a
+  2d6 morale check: the leader-modified base (`commandMorale`) plus the
+  situational RR 166 modifiers the Judge ticks (employer present, casualties,
+  ordered into danger, …). The roll posts to chat; interpretation stays with the
+  table. Lives here, not on the acks-lib group sheet.
+
 ## 0.21.0
 
 - **Hire-as-group now feeds the RAW officer mechanics.** Each troop stack is

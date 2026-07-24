@@ -16,7 +16,8 @@
 import { MODULE_ID, HOOKS, FLAG_RECORD } from "../constants.mjs";
 import HenchmanRecord from "../data/henchman-record.mjs";
 import { effectiveLoyalty, effectiveMorale, loyaltyDeltaForOutcome, outcomeLeavesService, clampScore } from "../rules/loyalty.mjs";
-import { henchmanWage } from "../rules/wages.mjs";
+import { henchmanWage, mercenaryWage } from "../rules/wages.mjs";
+import { FLAG_GROUP_PAY } from "./hire-group.mjs";
 import { collectEffectModifiers, sumEffectModifiers, toDialogModifiers, hasEffectFlag } from "../effects.mjs";
 import * as adapter from "../acks-adapter.mjs";
 import { openThrowDialog } from "../apps/throw-dialog.mjs";
@@ -272,13 +273,52 @@ function dueHirelings(employer, currentTime) {
   return due;
 }
 
+const GROUP_TYPE = "acks-lib.group";
+
+/** A mercenary group's monthly wage (RR 168): every living body's troop wage,
+ *  read from each stack's troop type. The officer is a lone retainer paid through
+ *  the normal hireling cycle, not counted here. */
+function groupMonthlyWage(group) {
+  return (group.system?.stacks ?? []).reduce((sum, s) => {
+    const each = mercenaryWage(s.template?.label) ?? 0;
+    return sum + each * (s.size?.current ?? 0);
+  }, 0);
+}
+
+/** The employer's paid GROUPS whose wage month has elapsed. A group is billed
+ *  from its own actor (linked by `unit.employerUuid`), never `henchmenList`, so
+ *  it costs no PC henchman-cap slot. */
+function dueGroups(employer, currentTime) {
+  const due = [];
+  const groups = game.actors.filter((a) => a.type === GROUP_TYPE && a.system?.unit?.employerUuid === employer.uuid);
+  for (const group of groups) {
+    const monthly = groupMonthlyWage(group);
+    if (monthly <= 0) continue;
+    const pay = group.getFlag(MODULE_ID, FLAG_GROUP_PAY) ?? {};
+    const last = pay.lastPaidTime ?? 0;
+    const months = Math.floor((currentTime - last) / secondsPerMonth());
+    if (months >= 1) {
+      due.push({ isGroup: true, group, months, monthly, amount: monthly * months, paidThrough: last + months * secondsPerMonth() });
+    }
+  }
+  return due;
+}
+
+/** Missed wages sour a unit (RR 166): drop its morale by one, clamped. */
+async function adjustGroupMorale(group, delta) {
+  const cur = Number(group.system?.unit?.morale ?? 0);
+  await group.update({ "system.unit.morale": Math.max(-6, Math.min(4, cur + delta)) });
+}
+
 /**
  * Pay all due wages for one employer: gold LEAVES the employer and LANDS on
  * each hireling — into their bank unless the `wagesToBank` setting is off.
+ * Paid GROUPS are billed too (gold leaves the employer; a unit has no bank),
+ * and unpaid ones accrue arrears and lose morale.
  */
 export async function payWagesFor(employer, { markMissed = false } = {}) {
   const currentTime = now();
-  const due = dueHirelings(employer, currentTime);
+  const due = [...dueHirelings(employer, currentTime), ...dueGroups(employer, currentTime)];
   if (!due.length) {
     ui.notifications.info(game.i18n.format("ACKS-HENCHMEN.wage.nothingDue", { name: employer.name }));
     return;
@@ -289,7 +329,23 @@ export async function payWagesFor(employer, { markMissed = false } = {}) {
     if (!paid) markMissed = true; // insufficient funds → wages missed
   }
   const toBank = getSetting("wagesToBank");
-  for (const { actor, record, amount, paidThrough } of due) {
+  for (const d of due) {
+    if (d.isGroup) {
+      // A unit has no bank to credit — the gold already left the employer above.
+      // Record the payday; a missed month accrues arrears and drops morale.
+      const pay = d.group.getFlag(MODULE_ID, FLAG_GROUP_PAY) ?? {};
+      if (markMissed) {
+        await d.group.setFlag(MODULE_ID, FLAG_GROUP_PAY, {
+          lastPaidTime: d.paidThrough,
+          arrearsGp: (pay.arrearsGp ?? 0) + d.amount,
+        });
+        await adjustGroupMorale(d.group, -1);
+      } else {
+        await d.group.setFlag(MODULE_ID, FLAG_GROUP_PAY, { ...pay, lastPaidTime: d.paidThrough });
+      }
+      continue;
+    }
+    const { actor, record, amount, paidThrough } = d;
     if (markMissed) {
       await actor.setFlag(MODULE_ID, FLAG_RECORD, {
         ...record,
@@ -316,8 +372,14 @@ export async function payWagesFor(employer, { markMissed = false } = {}) {
 /** Whisper per-employer wages-due cards (time watcher). */
 async function checkWagesDue(currentTime) {
   if (!getSetting("wageReminders")) return;
+  const anyGroups = game.actors.some((g) => g.type === GROUP_TYPE);
   const employers = game.actors.filter(
-    (a) => a.type === "character" && !a.system?.retainer?.enabled && (a.system?.henchmenList?.length || (a.getFlag(MODULE_ID, "monsterHenchmenList") ?? []).length)
+    (a) =>
+      a.type === "character" &&
+      !a.system?.retainer?.enabled &&
+      (a.system?.henchmenList?.length ||
+        (a.getFlag(MODULE_ID, "monsterHenchmenList") ?? []).length ||
+        (anyGroups && game.actors.some((g) => g.type === GROUP_TYPE && g.system?.unit?.employerUuid === a.uuid)))
   );
   for (const employer of employers) {
     const due = dueHirelings(employer, currentTime);

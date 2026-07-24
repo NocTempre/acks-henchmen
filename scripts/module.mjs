@@ -297,4 +297,25 @@ Hooks.on("renderActorSheetV2", (app, element) => {
   else header.append(button);
 });
 
+/* "Roll Unit Morale" on an acks-lib.group actor's directory context menu — the
+ * group sheet lives in acks-lib, so this stays out of it. */
+Hooks.on("getActorContextOptions", (_directory, options) => {
+  const findActor = (li) => {
+    const el = li instanceof HTMLElement ? li : li?.[0];
+    const id = el?.dataset?.entryId ?? el?.dataset?.documentId;
+    return id ? game.actors.get(id) : null;
+  };
+  options.push({
+    label: "ACKS-HENCHMEN.unitMorale.menu",
+    icon: '<i class="fas fa-flag"></i>',
+    visible: (li) => findActor(li)?.type === "acks-lib.group",
+    callback: async (li) => {
+      const actor = findActor(li);
+      if (!actor) return;
+      const { openUnitMoraleDialog } = await import("./apps/unit-morale-dialog.mjs");
+      openUnitMoraleDialog(actor);
+    },
+  });
+});
+
 export { registerCardAction, getSetting };

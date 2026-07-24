@@ -16,6 +16,12 @@ import { MODULE_ID, HOOKS } from "../constants.mjs";
 import { hire, employerOwnership, updateCandidate } from "./hire.mjs";
 import { mercenaryMorale } from "../rules/wages.mjs";
 import { optTable } from "../rules/tables.mjs";
+import { now } from "../time.mjs";
+
+/** Group pay state lives in a henchmen flag on the group actor — a group is a
+ *  paid unit that never enters the core `henchmenList` (so it costs no PC
+ *  henchman-cap slot). `{ lastPaidTime, arrearsGp }`. */
+export const FLAG_GROUP_PAY = "groupPay";
 
 const GROUP_TYPE = "acks-lib.group";
 const acksGroups = () => globalThis.acksLib?.groups ?? null;
@@ -116,6 +122,8 @@ async function findOrCreateGroup(employer, location) {
       // overrides this with its higher rank.
       "system.unit.officerLevel": Number(employer.system?.details?.level ?? 0) || 0,
     });
+    // Start the wage clock — the unit is a paid retainer from this month.
+    await group.setFlag(MODULE_ID, FLAG_GROUP_PAY, { lastPaidTime: now(), arrearsGp: 0 });
   }
   return group;
 }
