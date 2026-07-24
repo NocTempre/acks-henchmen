@@ -21,6 +21,32 @@ import { now, advanceDays, nextMarketRollTime } from "../time.mjs";
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 const { ActorSheetV2 } = foundry.applications.sheets;
 
+/**
+ * Does a directed-search spec match this candidate? A directed CLASS search
+ * reveals every available candidate of that class (and, for the class+level
+ * tier, that level) to the poster — not only the ones the replacement mechanic
+ * converted. A proficiency-only search matches the tag the replacement stamps
+ * on `notes` (best-effort — a bare walk-in carries no proficiency record).
+ * Shared-segment specs (general henchman, mercenary, specialist) are NOT
+ * directed and never match here; they are covered by the segment logic.
+ */
+function directedSpecMatches(spec, c) {
+  const kind = spec?.kind ?? "";
+  const wantsClass = kind === "henchmanByClass" || kind === "henchmanByClassProficiency";
+  const wantsProf = kind === "henchmanByProficiency" || kind === "henchmanByClassProficiency";
+  if (!wantsClass && !wantsProf) return false;
+  if (wantsClass) {
+    if (!spec.classKey) return false;
+    if (String(c.classKey ?? "").toLowerCase() !== String(spec.classKey).toLowerCase()) return false;
+    // class+level tier: the level was part of what was sought.
+    if (spec.level != null && (c.level ?? null) !== spec.level) return false;
+    return true;
+  }
+  // proficiency-only search: only a candidate carrying the proficiency tag matches.
+  const name = String(spec.proficiencyName ?? "").toLowerCase();
+  return !!name && String(c.notes ?? "").toLowerCase().includes(name);
+}
+
 export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
   static DEFAULT_OPTIONS = {
     classes: ["acks-henchmen", "location-sheet"],
@@ -196,6 +222,18 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     const maskedSegments = new Set(
       postings.filter((p) => p.segment && p.playersSeeDetails === false).map((p) => p.segment)
     );
+    // A viewer's own active DIRECTED (private, no shared segment) searches
+    // reveal every matching available candidate to them and route it to the
+    // SPECIAL bucket — not only the ones the replacement mechanic converted.
+    // GM sees everything already, so this is a player-facing reveal. This only
+    // ADDS visibility and re-buckets the same rows: it can never hide a
+    // candidate (the "blank everything" regression).
+    const myDirectedSpecs = game.user.isGM
+      ? []
+      : postings
+          .filter((p) => p.status === "active" && !p.segment && ownedUuids.includes(p.employerUuid))
+          .map((p) => p.spec?.toObject?.() ?? p.spec ?? {});
+    const matchesMyDirected = (c) => myDirectedSpecs.some((s) => directedSpecMatches(s, c));
     const playerVisible = (c) => {
       if (game.user.isGM) return true;
       if (c.privateToUuid) return ownedUuids.includes(c.privateToUuid) && ["available", "hired"].includes(c.status);
@@ -203,6 +241,8 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
       // A replaced candidate is always visible to the recruiter whose
       // directed search found them (highlighted, month-long).
       if (c.highlightFor && ownedUuids.includes(c.highlightFor)) return true;
+      // My directed search reveals every available candidate it matches.
+      if (matchesMyDirected(c)) return true;
       if (visibility === "none") return false;
       if (visibility === "all") return true;
       if (String(c.segment ?? "").startsWith("henchman:") && coversAllHenchmen) return true;
@@ -252,12 +292,16 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
         };
       })
       .sort((a, b) => (a.status === b.status ? 0 : a.status === "available" ? -1 : 1));
-    // Directed-search results (private candidates) live in the SPECIAL
-    // bucket: they stay until hired or the month re-rolls.
-    context.directedRows = rows.filter((c) => c.isPrivate);
-    context.henchmenRows = rows.filter((c) => henchKinds.includes(c.kind) && !c.isPrivate);
-    context.mercenaryRows = rows.filter((c) => c.kind === "mercenary" && !c.isPrivate);
-    context.specialistRows = rows.filter((c) => c.kind === "specialist" && !c.isPrivate);
+    // The SPECIAL bucket holds everything a viewer's directed searches reveal:
+    // candidates claimed privately (replacements), those highlighted for them,
+    // AND every available candidate their active class/proficiency search
+    // matches — even walk-ins the search did not convert. A row lands in the
+    // special bucket OR a normal one, never both, so nothing is dropped.
+    const isDirectedRow = (c) => c.isPrivate || c.isHighlighted || matchesMyDirected(c);
+    context.directedRows = rows.filter(isDirectedRow);
+    context.henchmenRows = rows.filter((c) => henchKinds.includes(c.kind) && !isDirectedRow(c));
+    context.mercenaryRows = rows.filter((c) => c.kind === "mercenary" && !isDirectedRow(c));
+    context.specialistRows = rows.filter((c) => c.kind === "specialist" && !isDirectedRow(c));
     context.candidateCount = rows.length - context.directedRows.length;
 
     // Special hires: real actors placed by the GM (no time limit unless
