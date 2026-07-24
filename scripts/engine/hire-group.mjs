@@ -1,4 +1,4 @@
-/* global game, Actor, Hooks, ChatMessage */
+/* global game, ui, Actor, Hooks, ChatMessage */
 /**
  * Hire a whole unit from the market as ONE `acks-lib.group` (skirmish scale).
  *
@@ -14,9 +14,42 @@
  */
 import { MODULE_ID, HOOKS } from "../constants.mjs";
 import { hire, employerOwnership, updateCandidate } from "./hire.mjs";
+import { mercenaryMorale } from "../rules/wages.mjs";
+import { optTable } from "../rules/tables.mjs";
 
 const GROUP_TYPE = "acks-lib.group";
 const acksGroups = () => globalThis.acksLib?.groups ?? null;
+
+/** Mounted troop types — they count DOUBLE toward the RR 169 command capacity
+ *  (a platoon is 30 infantry OR 15 cavalry). */
+const MOUNTED_TYPES = new Set([
+  "lightCavalry", "mountedCrossbowman", "horseArcher", "mediumCavalry", "heavyCavalry",
+  "cataphractCavalry", "camelArcher", "camelLancer", "warElephant", "beastRider",
+]);
+
+/** The mercenary-officer title from a specialist type ("mercOfficerCaptain" → "captain"). */
+const officerTitle = (specialistType) => (String(specialistType ?? "").match(/^mercOfficer(.+)$/i)?.[1] ?? "").toLowerCase();
+
+/** The officer's RR 171 morale modifier (mercOfficer* from the table; marshals /
+ *  master mariners +1 per the RR 166 role group; else 0). */
+function officerMoraleModifier(specialistType) {
+  const title = officerTitle(specialistType);
+  if (title) {
+    const row = (optTable("wages", "mercenaryOfficers")?.rows ?? []).find((r) => r.title === title);
+    if (row) return row.moraleModifier ?? 0;
+  }
+  return /^(marshal|marinerMaster)/i.test(specialistType ?? "") ? 1 : 0;
+}
+
+/** The officer's level — the RR 171 table value for a mercOfficer, else the actor's. */
+function officerLevelFor(specialistType, officerActor) {
+  const title = officerTitle(specialistType);
+  if (title) {
+    const row = (optTable("wages", "mercenaryOfficers")?.rows ?? []).find((r) => r.title === title);
+    if (row?.level) return row.level;
+  }
+  return Number(officerActor?.system?.details?.level ?? 0) || 0;
+}
 
 /** acks scores block from a candidate's rolled attributes (acks stores WIS as `.wil`). */
 function scoresFromAttributes(a) {
@@ -110,21 +143,47 @@ export async function hireAsGroup(location, employer, { troops = [], officerCand
     const key = await groups.addStack(group, proto, { count });
     if (key) {
       stacks.push(key);
-      if (candidate.troopType) await groups.patchStack(group, key, (s) => (s.template.label = candidate.troopType));
+      // Troops addendum: cavalry weight (command capacity) + RR 166 base morale.
+      const mounted = MOUNTED_TYPES.has(candidate.troopType);
+      const baseMorale = mercenaryMorale(candidate.troopType) ?? 0;
+      await groups.patchStack(group, key, (s) => {
+        if (candidate.troopType) s.template.label = candidate.troopType;
+        s.mounted = mounted;
+        s.baseMorale = baseMorale;
+      });
     }
     await updateCandidate(location, pick.candidateId, { status: "hired" });
   }
 
-  // Officer → a lone leveled actor (full individual hire), linked as commander.
+  // Officer → a lone leveled actor (full individual hire), linked as commander,
+  // with the RR 171 morale modifier + level cached so command-morale and command
+  // capacity are computable without loading the officer.
   let officer = null;
   if (officerCandidateId) {
+    const offCand = getCandidate(location, officerCandidateId);
+    const specialistType = offCand?.specialistType ?? "";
     const result = await hire(location, officerCandidateId, employer, { category: "specialist" });
     officer = result?.actor ?? null;
     if (officer) {
-      // officerMoraleBonus is the RR 171 modifier; carried as data for the
-      // command-morale read (0 until a rules-table lookup or acks-troops sets it).
-      await group.update({ "system.unit.officerUuid": officer.uuid });
+      await group.update({
+        "system.unit.officerUuid": officer.uuid,
+        "system.unit.officerMoraleBonus": Math.max(0, officerMoraleModifier(specialistType)),
+        "system.unit.officerLevel": officerLevelFor(specialistType, officer),
+      });
     }
+  }
+
+  // RR 169: warn if the unit is larger than its commander can personally lead
+  // (needs a higher-rank officer, or past a platoon the army command structure
+  // that is acks-troops). Advisory — the hire still stands.
+  const settled = game.actors.get(group.id) ?? group;
+  if (settled.system.overCommand) {
+    ui.notifications?.warn(
+      game.i18n.format("ACKS-HENCHMEN.group.overCommand", {
+        strength: settled.system.troopStrength,
+        cap: settled.system.commandCapacity,
+      })
+    );
   }
 
   Hooks.callAll(HOOKS.ROSTER_CHANGED, { employer });

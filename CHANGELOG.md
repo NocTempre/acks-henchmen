@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.21.0
+
+- **Hire-as-group now feeds the RAW officer mechanics.** Each troop stack is
+  tagged `mounted` (cavalry, which count double toward command) and given its
+  RR 166 base morale (`mercenaryMorale` by troop type); the officer's RR 171
+  morale modifier and level are cached on the group (`unit.officerMoraleBonus` /
+  `officerLevel`), so the group's `commandMorale` and `commandCapacity` are real
+  numbers, not the inert 0s v0.20.0 shipped. On hire the unit is checked against
+  the RR 169 "personally led" limit (a 3rd+ level officer leads a platoon of 30
+  infantry / 15 cavalry) and warns if it exceeds what the officer can lead. The
+  2d6 unit-morale roll itself stays with acks-influence (the morale-roll owner);
+  the group supplies the value.
+- Requires acks-lib >= 0.23.0 (the command-capacity + unit-morale derivations).
+
 ## 0.20.0
 
 - **Hire a whole unit from the market as one group.** A new "Hire as Group"

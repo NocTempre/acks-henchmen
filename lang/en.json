@@ -362,6 +362,7 @@
   "ACKS-HENCHMEN.group.hireFailed": "Could not hire as a group ({reason}).",
   "ACKS-HENCHMEN.group.noEmployer": "No employer available to hire for.",
   "ACKS-HENCHMEN.group.noneAvailable": "No troops or officers are available in the market to form a group.",
+  "ACKS-HENCHMEN.group.overCommand": "This unit ({strength} infantry-equivalents) is larger than its officer can personally lead (RR 169 limit {cap}). Hire a higher-rank officer, or split it — a force of several platoons is an army (acks-troops), not a skirmish unit.",
   "ACKS-HENCHMEN.gold.insufficient": "{name} cannot pay {gp} gp ({reason}).",
   "ACKS-HENCHMEN.gold.spent": "{name} pays {gp} gp — {reason}.",
   "ACKS-HENCHMEN.gold.noCoins": "{name} has no money items to credit.",
