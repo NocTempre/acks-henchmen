@@ -59,18 +59,26 @@ async function createTroopPrototype(candidate, employer) {
   return Actor.implementation.create(data);
 }
 
-/** Find the employer's existing merc group, else create one named for them. */
+/** Find the employer's existing merc group, else create one named for them.
+ *  The unit block is set with a post-create update: create-time nested
+ *  `system.unit.*` does not persist for this TypeDataModel (verified live —
+ *  category/employer defaulted), but updates do. */
 async function findOrCreateGroup(employer, location) {
   const existing = game.actors.find((a) => a.type === GROUP_TYPE && a.system?.unit?.employerUuid === employer.uuid);
   if (existing) return existing;
-  return Actor.implementation.create({
+  const group = await Actor.implementation.create({
     name: game.i18n.format("ACKS-HENCHMEN.group.companyName", { name: employer.name }),
     type: GROUP_TYPE,
     ownership: employerOwnership(employer),
-    system: {
-      unit: { category: "mercenary", employerUuid: employer.uuid, locationUuid: location?.uuid ?? "" },
-    },
   });
+  if (group) {
+    await group.update({
+      "system.unit.category": "mercenary",
+      "system.unit.employerUuid": employer.uuid,
+      "system.unit.locationUuid": location?.uuid ?? "",
+    });
+  }
+  return group;
 }
 
 /**
