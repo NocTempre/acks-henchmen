@@ -180,6 +180,70 @@ export function applyDirectedReplacement({ location, spec, employerUuid, quantit
 }
 
 /**
+ * Build ONE candidate for a GM post: place the NPC the GM named, honouring the
+ * fields they specified (class, level, proficiency) and randomising ONLY the
+ * ones they left blank (name, culture, age, appearance, and any unspecified
+ * class or level). A GM does not search — they stock the pool — so this mints a
+ * concrete individual available now, a normal shared henchman for its level.
+ * `monthLong` exempts it from the weekly churn (a deliberate placement should
+ * not wander off after a week); the month rollover still refreshes the market.
+ */
+async function buildGmCandidate(location, spec, { marketClass = 4 } = {}) {
+  const demographics = demographicsOf(location);
+  const variant = location.system.classRarityTableId || "default";
+
+  // Level: use the specified one, else roll for the market.
+  let level = spec.level != null && spec.level >= 1 ? spec.level : null;
+  if (level == null) {
+    const rolled = await rollRandomLevel(rollDice, clampMarketClass(marketClass));
+    level = rolled.level;
+  }
+
+  // Class: use the specified one, else roll from the leveled distribution.
+  let classKey = spec.classKey ?? "";
+  let doubleD100;
+  if (!classKey && level > 0) {
+    const rolled = await rollClassFromDistribution(rollDice, variant, level);
+    classKey = rolled.classKey;
+    doubleD100 = rolled.rolls;
+  }
+
+  const c = {
+    id: foundry.utils.randomID(),
+    kind: "henchman", // a concrete individual joins the henchman pool
+    quantity: 1,
+    segment: `henchman:${level}`, // shared pool member for its level
+    privateToUuid: "",
+    highlightFor: "",
+    monthLong: true,
+    status: "available",
+    availableFromTime: now(),
+    classKey,
+    level,
+    wageGp: henchmanWage(level),
+    wageUnit: "month",
+    notes: spec.proficiencyName ? `${spec.proficiencyName} ×${spec.proficiencyRanks ?? 1}` : "",
+  };
+  if (doubleD100) c.doubleD100 = doubleD100;
+
+  // Identity (name / gender / culture / age / appearance) is always randomised
+  // — the dialog does not capture it, so it is "unspecified". Best-effort.
+  try {
+    const identity = generateIdentity({ demographics, level, classKey, station: "commoner" });
+    c.name = identity.name;
+    c.gender = identity.gender;
+    c.culture = identity.culture;
+    c.age = identity.age;
+    c.appearance = identity.appearance;
+    if (identity.hitDice) c.hitDice = identity.hitDice;
+    if (identity.profCount != null) c.profCount = identity.profCount;
+  } catch (err) {
+    console.warn(`${MODULE_ID} | GM candidate identity generation failed`, err);
+  }
+  return c;
+}
+
+/**
  * Build candidate records for one rolled pool.
  * @returns {Promise<object[]>}
  */
@@ -423,6 +487,11 @@ export async function createPosting(location, rawSpec, employer, { dedicatedSear
   // it out of spec comparisons and storage.
   const { presentedLevel = null, ...spec } = rawSpec;
   const isPrivate = PRIVATE_KINDS.includes(spec.kind);
+  // A GM at the keyboard (no requestUserId) placing a directed NPC is stocking
+  // the pool, not searching: it skips the player search rules (criteria,
+  // once-per-month-per-spec) and simply adds the named NPC, so a GM can place
+  // as many as they like.
+  const gmAdd = isPrivate && !requestUserId;
   const segment = isPrivate ? "" : segmentKeyFor(spec);
 
   // Player posts name WHAT they want: at least one criterion beyond a warm
@@ -458,10 +527,10 @@ export async function createPosting(location, rawSpec, employer, { dedicatedSear
   if (!isPrivate) {
     const dup = postings.find((p) => p.status === "active" && p.segment === segment && p.employerUuid === (employer?.uuid ?? ""));
     if (dup) return { error: "duplicate-segment" };
-  } else {
+  } else if (!gmAdd) {
     // Once per month per TYPE of directed search per recruiter (user's RAW
     // model): a second by-class search this month is blocked even for a
-    // different class.
+    // different class. GM placements are exempt (they are not searches).
     const dup = postings.find(
       (p) =>
         p.status === "active" &&
@@ -497,7 +566,16 @@ export async function createPosting(location, rawSpec, employer, { dedicatedSear
 
   let replacedCandidates = null;
   let replacedCount = 0;
-  if (isPrivate) {
+  // A GM does not SEARCH — they place the NPC they named (gmAdd, computed
+  // above): ADD that candidate to the pool, random only on the fields left
+  // blank. Players still pay to search, which finds people by replacement.
+  if (gmAdd) {
+    const mc = effectiveMarketClass(location, employer);
+    const placed = await buildGmCandidate(location, spec, { marketClass: mc });
+    newCandidates = [placed];
+    posting.totalAvailable = 1;
+    posting.rollDetail = `GM-placed: ${placed.classKey || "henchman"}${placed.level ? ` L${placed.level}` : ""}`;
+  } else if (isPrivate) {
     // DIRECTED SEARCH → POOL REPLACEMENT (user's RAW model): the roll
     // (final rarity vs. Henchman Availability by Market Class and Rarity)
     // does not mint new people — it replaces rolled leveled henchmen still
@@ -538,16 +616,20 @@ export async function createPosting(location, rawSpec, employer, { dedicatedSear
     }
   }
 
-  const fee = await chargeWeeklyFee(location, employer, 1);
-  posting.feesPaid.push({ time: currentTime, gp: fee.gp });
+  // A GM placement is not a paid search — no weekly fee, no ledger line.
+  let fee = { gp: 0 };
+  if (!gmAdd) {
+    fee = await chargeWeeklyFee(location, employer, 1);
+    posting.feesPaid.push({ time: currentTime, gp: fee.gp });
+  }
 
-  const update = {
-    "system.postings": [...postings, posting],
-    "system.searchLedger": [
+  const update = { "system.postings": [...postings, posting] };
+  if (!gmAdd) {
+    update["system.searchLedger"] = [
       ...(location.system.searchLedger ?? []).map((l) => l.toObject?.() ?? l),
       { time: currentTime, gp: fee.gp, postingId: posting.id, paidByUuid: employer?.uuid ?? "" },
-    ],
-  };
+    ];
+  }
   if (replacedCandidates) {
     // directed search: the pool itself was rewritten (replacements)
     update["system.candidates"] = newCandidates.length ? [...replacedCandidates, ...newCandidates] : replacedCandidates;
@@ -562,12 +644,20 @@ export async function createPosting(location, rawSpec, employer, { dedicatedSear
       ...(location.system.candidates ?? []).map((c) => c.toObject?.() ?? c),
       ...newCandidates,
     ];
+    if (gmAdd) {
+      update["system.marketLog"] = marketLogAppend(
+        (location.system.marketLog ?? []).map((l) => l.toObject?.() ?? l),
+        currentTime,
+        "gmPlace",
+        `${posting.rollDetail} — ${newCandidates[0]?.name ?? "?"}`
+      );
+    }
   }
   if (nextRolls) update["system.marketRolls"] = nextRolls;
   if (anchorUpdate) update["system.monthAnchorTime"] = anchorUpdate;
   await location.update(update);
   Hooks.callAll(HOOKS.POSTING_CREATED, { location, posting, employer });
-  return { posting, fee, replaced: replacedCount };
+  return { posting, fee, replaced: replacedCount, gmPlaced: gmAdd, placedName: gmAdd ? newCandidates[0]?.name : undefined };
 }
 
 /* ------------------------- time processing ------------------------- */

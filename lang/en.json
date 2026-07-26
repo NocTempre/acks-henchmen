@@ -582,5 +582,6 @@
   "ACKS-HENCHMEN.location.marketWeekHint": "Week of the current market month. Arrivals land in weeks 1-3; late weeks are quiet by the book until the next monthly roll.",
   "ACKS-HENCHMEN.location.nextRoll": "next roll in",
   "ACKS-HENCHMEN.posting.replaced": "Search succeeded: {n} of the month's rolled henchmen now match what you sought (starred, available all month). Fee {fee} gp.",
-  "ACKS-HENCHMEN.posting.replacedNone": "Search succeeded ({total} found) — but no rolled leveled henchmen remain in the market this month to re-sign. Fee {fee} gp; the post re-rolls next month."
+  "ACKS-HENCHMEN.posting.replacedNone": "Search succeeded ({total} found) — but no rolled leveled henchmen remain in the market this month to re-sign. Fee {fee} gp; the post re-rolls next month.",
+  "ACKS-HENCHMEN.posting.gmPlaced": "Placed {name} in the pool — available now. Fields you left blank were rolled."
 }

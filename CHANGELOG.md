@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.24.0
+
+- **GM posts place the named NPC in the pool, random only on the blanks.** A GM
+  does not search — a GM-initiated directed post (by class, class+level,
+  proficiency, or class+proficiency) now ADDS one candidate honouring exactly
+  what the GM specified and rolling only what they left blank (name, culture,
+  age, appearance, and any unspecified class or level), available now, as a
+  normal shared henchman for its level. No rarity roll, no replacement, no
+  search fee, and no once-per-month limit (a GM may place as many as they like).
+  Players are unchanged: their directed searches still pay to find people by
+  replacement. (GM placements last the current market month; the rollover
+  refreshes the pool as usual.)
+
 ## 0.23.1
 
 - **Reload is now a pure recovery/refresh, not a second regenerate.** 0.23.0's

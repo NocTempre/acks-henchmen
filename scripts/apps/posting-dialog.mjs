@@ -184,6 +184,10 @@ export class PostingDialog extends HandlebarsApplicationMixin(ApplicationV2) {
       ui.notifications.error(game.i18n.localize(`ACKS-HENCHMEN.posting.error.${result.error}`));
       return;
     }
+    if (result.gmPlaced) {
+      ui.notifications.info(game.i18n.format("ACKS-HENCHMEN.posting.gmPlaced", { name: result.placedName ?? "?" }));
+      return;
+    }
     if (result.replaced != null && PRIVATE_KINDS.includes(spec.kind)) {
       // Directed search: say what the replacement actually did — a success
       // with no valid targets left silently "finding no one" reads as broken.
