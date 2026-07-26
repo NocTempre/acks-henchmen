@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.23.1
+
+- **Reload is now a pure recovery/refresh, not a second regenerate.** 0.23.0's
+  Reload button re-rolled an empty market, duplicating Process time. It now only
+  re-loads the persisted rules tables into the registry (recovering a board that
+  reads empty because a lost registry blanked its labels or threw the render) and
+  re-renders — the existing, stored market reappears. Rolling stays Process
+  time's single job. Reload no longer writes the location, so any viewer can run
+  it to fix a display glitch. The missing-tables guard (0.23.0) is unchanged.
+
 ## 0.23.0
 
 - **Market no longer disappears when the rules tables briefly go missing.** The

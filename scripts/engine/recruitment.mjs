@@ -802,21 +802,22 @@ export async function processLocation(location, currentTime = now()) {
 }
 
 /**
- * Manual recovery — the Reload button (distinct from Process Time).
+ * Reload — RECOVER a market that reads empty because of a render / registry
+ * error, not because it is genuinely empty. It does NOT roll or regenerate the
+ * market: rolling is Process time's job, and there is one regenerate path, not
+ * two.
  *
- * The book that seeds the ruledata tables does not persist on a remote, and a
- * world relaunch / GM leaving / module update can leave the in-memory registry
- * momentarily without them. The tables themselves DO persist as world data
- * (acks-location), so this:
- *   1. re-loads the persisted ruledata into the registry (no book needed), then
- *   2. if the shared market is empty — because a roll was deferred while the
- *      tables were missing — rolls the CURRENT month now and applies arrivals.
- * A populated market is left untouched. Idempotent and safe to click twice.
+ * The imported ruledata persists as world data (acks-location), but a reload /
+ * GM change / module update can leave the in-memory registry without it — which
+ * blanks the market's labels and can throw the sheet's render, so the board
+ * LOOKS empty though its candidates are still stored on the location actor.
+ * This re-mirrors that persisted data back into the registry; the caller then
+ * re-renders and the existing market and its labels reappear. Client-local and
+ * side-effect-free on the location (no write), so any viewer may run it.
  *
- * @returns {Promise<{ok?, error?, reloaded?, rolled?}>}
+ * @returns {Promise<{reloaded: object|null, tablesPresent: boolean}>}
  */
-export async function reloadMarket(location, currentTime = now()) {
-  // 1. Re-mirror the world-persisted ruledata into the registry.
+export async function reloadMarket() {
   const svc = globalThis.acksLib?.services?.get?.("ruledata-import");
   let reloaded = null;
   try {
@@ -824,36 +825,7 @@ export async function reloadMarket(location, currentTime = now()) {
   } catch (err) {
     console.warn(`${MODULE_ID} | ruledata reload failed`, err);
   }
-
-  // 2. Still no availability tables → nothing to roll from. The world data is
-  //    genuinely gone; the GM must re-import from the book.
-  if (!hasDoc("availability")) return { error: "tables-missing", reloaded };
-
-  // 3. Roll the current month only if the SHARED market is empty (a populated
-  //    market is left alone; directed/private results are preserved).
-  const sys = location.system;
-  const shared = (sys.candidates ?? []).map((c) => c.toObject?.() ?? c).filter((c) => !c.privateToUuid);
-  if (shared.length) return { ok: true, reloaded, rolled: 0 };
-
-  const anchor = sys.monthAnchorTime || currentTime;
-  const month = await rollMonth(location, anchor, currentTime);
-  const kept = (sys.candidates ?? []).map((c) => c.toObject?.() ?? c).filter((c) => c.privateToUuid && !c.monthLong);
-  await location.update({
-    "system.candidates": [...kept, ...month.candidates],
-    "system.marketRolls": month.marketRolls,
-    "system.monthAnchorTime": anchor,
-    "system.marketLog": marketLogAppend(
-      (sys.marketLog ?? []).map((l) => l.toObject?.() ?? l),
-      currentTime,
-      "reload",
-      `manual reload: ${month.candidates.length} candidates rolled from persisted tables`
-    ),
-  });
-  // Apply arrivals (and weekly fees) so freshly-rolled week-1 candidates show
-  // immediately rather than only after the next time advance. Not rolled over
-  // (anchor unchanged), so this will not re-roll.
-  await processLocation(location, currentTime);
-  return { ok: true, reloaded, rolled: month.candidates.length };
+  return { reloaded, tablesPresent: hasDoc("availability") };
 }
 
 /**

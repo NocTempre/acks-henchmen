@@ -457,24 +457,24 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
   }
 
   /**
-   * Reload the persisted ruledata and re-roll an empty market — recovery when a
-   * lost book link on the remote left the market blank. GM (or an owner) only,
-   * since it writes the location.
+   * Reload — re-load the persisted rules tables into the registry and re-render,
+   * to recover a board that reads empty because of a render / registry glitch
+   * (the data is still stored; the display or its labels failed). It does NOT
+   * roll the market — that is Process time. Client-local, so any viewer may run
+   * it; no location write.
    */
   static async #onReloadMarket() {
-    if (!(game.user.isGM || this.actor.testUserPermission(game.user, "OWNER"))) return;
-    const result = await reloadMarket(this.actor);
-    if (result.error === "tables-missing") {
+    const result = await reloadMarket();
+    // Force a full re-render: recovers a sheet that blanked when the registry
+    // lost its tables — the persisted market and its labels reappear.
+    await this.render(true);
+    if (!result.tablesPresent) {
       ui.notifications.error(game.i18n.localize("ACKS-HENCHMEN.location.reloadNoTables"));
     } else {
       ui.notifications.info(
-        game.i18n.format("ACKS-HENCHMEN.location.reloaded", {
-          layers: result.reloaded?.layers ?? 0,
-          rolled: result.rolled ?? 0,
-        })
+        game.i18n.format("ACKS-HENCHMEN.location.reloaded", { layers: result.reloaded?.layers ?? 0 })
       );
     }
-    this.render();
   }
 
   static async #onAdvanceWeek() {
