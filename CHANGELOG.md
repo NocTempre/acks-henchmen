@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.23.0
+
+- **Market no longer disappears when the rules tables briefly go missing.** The
+  book that seeds the ruledata does not persist on a remote, and a world
+  relaunch / GM leaving / module update can leave the registry momentarily
+  empty. A month roll REPLACES the whole shared market, so rolling against
+  missing tables produced ZERO and persisted an empty market over a full one —
+  "values disappear between loads". The monthly roll now defers when the
+  availability tables are absent, keeping the existing market intact until they
+  return (then it self-heals on the next process).
+- **Reload button on the location sheet** (beside Process time). Re-loads the
+  world-persisted rules tables into the registry — no book needed — and, if the
+  market is blank because a roll was deferred, rolls this month now and applies
+  arrivals. GM or location owner. Requires acks-location ≥ 0.4.0 for the
+  registry re-mirror (degrades to a plain re-roll without it).
+
 ## 0.22.1
 
 - **Hire-group UI: capped stepper grid for troops, dropdown for officers.** The

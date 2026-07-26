@@ -10,7 +10,7 @@
  */
 import { MODULE_ID, HOOKS, SECONDS_PER_DAY, SECONDS_PER_WEEK } from "../constants.mjs";
 import { getTable, optTable } from "../rules/tables.mjs";
-import { processLocation, closePosting } from "../engine/recruitment.mjs";
+import { processLocation, closePosting, reloadMarket } from "../engine/recruitment.mjs";
 import { executeAsGM } from "../sockets.mjs";
 import { addSpecialHire, updateSpecialHire } from "../engine/hire.mjs";
 import { openPostingDialog } from "./posting-dialog.mjs";
@@ -56,6 +56,7 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     actions: {
       createPosting: LocationSheet.#onCreatePosting,
       processNow: LocationSheet.#onProcessNow,
+      reloadMarket: LocationSheet.#onReloadMarket,
       advanceWeek: LocationSheet.#onAdvanceWeek,
       closePosting: LocationSheet.#onClosePosting,
       togglePlayerDetails: LocationSheet.#onTogglePlayerDetails,
@@ -453,6 +454,27 @@ export class LocationSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
   static async #onProcessNow() {
     const { arrived } = await processLocation(this.actor);
     ui.notifications.info(game.i18n.format("ACKS-HENCHMEN.location.processed", { arrived }));
+  }
+
+  /**
+   * Reload the persisted ruledata and re-roll an empty market — recovery when a
+   * lost book link on the remote left the market blank. GM (or an owner) only,
+   * since it writes the location.
+   */
+  static async #onReloadMarket() {
+    if (!(game.user.isGM || this.actor.testUserPermission(game.user, "OWNER"))) return;
+    const result = await reloadMarket(this.actor);
+    if (result.error === "tables-missing") {
+      ui.notifications.error(game.i18n.localize("ACKS-HENCHMEN.location.reloadNoTables"));
+    } else {
+      ui.notifications.info(
+        game.i18n.format("ACKS-HENCHMEN.location.reloaded", {
+          layers: result.reloaded?.layers ?? 0,
+          rolled: result.rolled ?? 0,
+        })
+      );
+    }
+    this.render();
   }
 
   static async #onAdvanceWeek() {

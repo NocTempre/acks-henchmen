@@ -33,7 +33,7 @@ import { parseAvailability } from "../rules/dice.mjs";
 import { rollClassFromDistribution, rollRandomLevel, rollProficiencyLevel } from "../rules/candidates.mjs";
 import { generateIdentity, classInfo } from "../rules/identity.mjs";
 import { henchmanWage } from "../rules/wages.mjs";
-import { getTable, optTable } from "../rules/tables.mjs";
+import { getTable, optTable, hasDoc } from "../rules/tables.mjs";
 import { sumEffectModifiers } from "../effects.mjs";
 import { getSetting } from "../settings.mjs";
 import * as adapter from "../acks-adapter.mjs";
@@ -601,7 +601,18 @@ export async function processLocation(location, currentTime = now()) {
   const rolledOver =
     monthAnchorTime &&
     (calStart != null ? monthAnchorTime < calStart : currentTime - monthAnchorTime >= secondsPerMonth());
-  if (!monthAnchorTime || rolledOver) {
+  // GUARD (critical): the month is due to roll, but rolling REPLACES the whole
+  // shared market. If the availability tables are not loaded — the book link
+  // that seeds them does not persist on a remote, and a world relaunch / GM
+  // leaving / module update can leave the registry momentarily empty — the roll
+  // would produce ZERO and persist an empty market over a full one ("values
+  // disappear between loads"). Never roll on missing tables: keep the existing
+  // market intact and retry on the next process (the Reload button forces it).
+  const marketDue = !monthAnchorTime || rolledOver;
+  if (marketDue && !hasDoc("availability")) {
+    console.warn(`${MODULE_ID} | market roll deferred for "${location.name}": availability tables not loaded (book not re-imported?)`);
+  }
+  if (marketDue && hasDoc("availability")) {
     // Long-running adverts: postings that already existed when the ending
     // month began ran it in full — designate them; their searches ease one
     // rarity for the whole location while the advert stays up.
@@ -788,6 +799,61 @@ export async function processLocation(location, currentTime = now()) {
     }
   }
   return { changed, arrived: [...arrivals.values()].reduce((s, n) => s + n, 0) };
+}
+
+/**
+ * Manual recovery — the Reload button (distinct from Process Time).
+ *
+ * The book that seeds the ruledata tables does not persist on a remote, and a
+ * world relaunch / GM leaving / module update can leave the in-memory registry
+ * momentarily without them. The tables themselves DO persist as world data
+ * (acks-location), so this:
+ *   1. re-loads the persisted ruledata into the registry (no book needed), then
+ *   2. if the shared market is empty — because a roll was deferred while the
+ *      tables were missing — rolls the CURRENT month now and applies arrivals.
+ * A populated market is left untouched. Idempotent and safe to click twice.
+ *
+ * @returns {Promise<{ok?, error?, reloaded?, rolled?}>}
+ */
+export async function reloadMarket(location, currentTime = now()) {
+  // 1. Re-mirror the world-persisted ruledata into the registry.
+  const svc = globalThis.acksLib?.services?.get?.("ruledata-import");
+  let reloaded = null;
+  try {
+    reloaded = (await svc?.reload?.()) ?? null;
+  } catch (err) {
+    console.warn(`${MODULE_ID} | ruledata reload failed`, err);
+  }
+
+  // 2. Still no availability tables → nothing to roll from. The world data is
+  //    genuinely gone; the GM must re-import from the book.
+  if (!hasDoc("availability")) return { error: "tables-missing", reloaded };
+
+  // 3. Roll the current month only if the SHARED market is empty (a populated
+  //    market is left alone; directed/private results are preserved).
+  const sys = location.system;
+  const shared = (sys.candidates ?? []).map((c) => c.toObject?.() ?? c).filter((c) => !c.privateToUuid);
+  if (shared.length) return { ok: true, reloaded, rolled: 0 };
+
+  const anchor = sys.monthAnchorTime || currentTime;
+  const month = await rollMonth(location, anchor, currentTime);
+  const kept = (sys.candidates ?? []).map((c) => c.toObject?.() ?? c).filter((c) => c.privateToUuid && !c.monthLong);
+  await location.update({
+    "system.candidates": [...kept, ...month.candidates],
+    "system.marketRolls": month.marketRolls,
+    "system.monthAnchorTime": anchor,
+    "system.marketLog": marketLogAppend(
+      (sys.marketLog ?? []).map((l) => l.toObject?.() ?? l),
+      currentTime,
+      "reload",
+      `manual reload: ${month.candidates.length} candidates rolled from persisted tables`
+    ),
+  });
+  // Apply arrivals (and weekly fees) so freshly-rolled week-1 candidates show
+  // immediately rather than only after the next time advance. Not rolled over
+  // (anchor unchanged), so this will not re-roll.
+  await processLocation(location, currentTime);
+  return { ok: true, reloaded, rolled: month.candidates.length };
 }
 
 /**
