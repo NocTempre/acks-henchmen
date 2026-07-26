@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.22.1
+
+- **Hire-group UI: capped stepper grid for troops, dropdown for officers.** The
+  hire-as-group dialog renders troop types localised in a grid of − / count / +
+  steppers capped at what the market actually holds (enforced in the stepper,
+  manual input, and the OK callback); officers are a single localised dropdown
+  disambiguated by name. Display-only — the pick shape handed to `hireAsGroup`
+  is unchanged.
+- **Market: a directed class search reveals ALL of that class.** A directed
+  recruitment search by class now reveals every AVAILABLE matching candidate to
+  the searcher and routes them to the special bucket, instead of only the few
+  the replacement mechanic converted. Additive re-bucketing only (a row is
+  special XOR normal, never dropped); GM visibility and pending candidates are
+  unchanged.
+
 ## 0.22.0
 
 - **A hired group is a PAID unit that costs no henchman-cap slot.** The wage
