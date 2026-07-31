@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.26.0
+
+- **Monster hirelings now appear in the employer's Hirelings tab** alongside
+  character henchmen. The card grid is rebuilt from the employer's data — character
+  henchmen (`henchmenList`) plus monster henchmen (the module's monster list) — so a
+  monstrous retainer shows as a Follower Card in the Henchmen bucket, not only in the
+  Roster window. Monster cards route open / loyalty / morale / dismiss through this
+  module's own handlers (the system's character-only hireling actions can't manage a
+  monster — `delHenchman` touches `henchmenList`); character cards keep the system's
+  actions unchanged.
+
 ## 0.25.0
 
 - **The character sheet's Hirelings tab is now a grid of Follower Cards.** Each
