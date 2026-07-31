@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.25.0
+
+- **The character sheet's Hirelings tab is now a grid of Follower Cards.** Each
+  Henchmen / Mercenaries / Specialists bucket renders as acks-lib's printed
+  Follower Card instead of a list row — the same card a hireling opens as its own
+  sheet. The cards are read-only and reuse the system's own hireling actions, so
+  opening, loyalty and morale rolls, and dismissal keep working against the right
+  hireling; the tab re-renders cleanly on any change. Pure runtime re-skin of the
+  system sheet (no core files touched); it degrades to the stock list if acks-lib
+  is older than 0.28.0. Requires acks-lib ≥ 0.28.0 for the `acksLib.followerCard`
+  renderer.
+
 ## 0.24.0
 
 - **GM posts place the named NPC in the pool, random only on the blanks.** A GM

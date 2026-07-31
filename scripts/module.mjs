@@ -36,6 +36,7 @@ import { bindCardListeners, registerCardAction } from "./chat/cards.mjs";
 import { registerSockets, executeAsGM, registerSocketAction } from "./sockets.mjs";
 import { registerEventEngine, openLoyaltyRoll, openObedienceRoll, recordCalamity, payWagesFor, effectiveLoyaltyFor, effectiveMoraleFor } from "./engine/events.mjs";
 import { openRosterApp } from "./apps/roster-app.mjs";
+import { installHirelingsGrid } from "./apps/hirelings-grid.mjs";
 import { recruitMonster, hireMonster, validateMonsterRecruit } from "./engine/monster.mjs";
 import { openFollowersDialog } from "./apps/followers-dialog.mjs";
 import * as slaveryRules from "./rules/slavery.mjs";
@@ -75,6 +76,10 @@ Hooks.once("init", () => {
   } catch (err) {
     console.warn(`${MODULE_ID} | template preload skipped`, err);
   }
+
+  // Re-skin the core character sheet's Hirelings tab as a grid of acks-lib
+  // Follower Cards (degrades to the stock list if acks-lib is too old).
+  installHirelingsGrid();
 });
 
 Hooks.once("setup", async () => {
