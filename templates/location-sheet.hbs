@@ -4,29 +4,29 @@
     <div class="header-fields">
       <input class="location-name" name="name" type="text" value="{{actor.name}}" placeholder="{{localize 'ACKS-HENCHMEN.location.name'}}" />
       <div class="market-class-line">
-        <span class="market-class-badge" data-tooltip="{{marketClassSource}}">
+        <span class="market-class-badge acks-tag" data-tooltip="{{marketClassSource}}">
           {{localize "ACKS-HENCHMEN.location.marketClass"}}: <strong>{{marketClassRoman}}</strong>
         </span>
         {{#if searchFeeFormula}}
-        <span class="market-class-badge" data-tooltip="{{localize 'ACKS-HENCHMEN.location.searchFeeHint'}}">
+        <span class="market-class-badge acks-tag" data-tooltip="{{localize 'ACKS-HENCHMEN.location.searchFeeHint'}}">
           {{localize "ACKS-HENCHMEN.location.searchFee"}}: <strong>{{searchFeeFormula}}</strong> gp/{{localize "ACKS-HENCHMEN.location.perWeek"}}
         </span>
         {{/if}}
         {{#if marketWeek}}
-        <span class="market-class-badge" data-tooltip="{{localize 'ACKS-HENCHMEN.location.marketWeekHint'}}">
+        <span class="market-class-badge acks-tag" data-tooltip="{{localize 'ACKS-HENCHMEN.location.marketWeekHint'}}">
           {{localize "ACKS-HENCHMEN.location.marketWeek"}} <strong>{{marketWeek}}</strong>{{#if nextRollDays}} · {{localize "ACKS-HENCHMEN.location.nextRoll"}} {{nextRollDays}}d{{/if}}
         </span>
         {{/if}}
         {{#if canProcess}}
-        <button type="button" data-action="processNow" data-tooltip="{{localize 'ACKS-HENCHMEN.location.processNowHint'}}">
+        <button type="button" class="acks-btn acks-btn--secondary acks-btn--sm" data-action="processNow" data-tooltip="{{localize 'ACKS-HENCHMEN.location.processNowHint'}}">
           <i class="fas fa-rotate"></i> {{localize "ACKS-HENCHMEN.location.processNow"}}
         </button>
-        <button type="button" data-action="reloadMarket" data-tooltip="{{localize 'ACKS-HENCHMEN.location.reloadHint'}}">
+        <button type="button" class="acks-btn acks-btn--secondary acks-btn--sm" data-action="reloadMarket" data-tooltip="{{localize 'ACKS-HENCHMEN.location.reloadHint'}}">
           <i class="fas fa-arrows-rotate"></i> {{localize "ACKS-HENCHMEN.location.reload"}}
         </button>
         {{/if}}
         {{#if isGM}}
-        <button type="button" data-action="advanceWeek" data-tooltip="{{localize 'ACKS-HENCHMEN.location.advanceWeekHint'}}">
+        <button type="button" class="acks-btn acks-btn--secondary acks-btn--sm" data-action="advanceWeek" data-tooltip="{{localize 'ACKS-HENCHMEN.location.advanceWeekHint'}}">
           <i class="fas fa-forward"></i> {{localize "ACKS-HENCHMEN.location.advanceWeek"}}
         </button>
         {{/if}}
@@ -48,7 +48,7 @@
         <button type="button" class="inline-add" data-action="createPosting"><i class="fas fa-plus"></i> {{localize "ACKS-HENCHMEN.posting.create"}}</button>
       </summary>
       {{#if postings.length}}
-      <table class="postings-table">
+      <table class="postings-table acks-table acks-table--compact acks-table--interactive">
         <thead>
           <tr>
             <th>{{localize "ACKS-HENCHMEN.posting.spec"}}</th>
@@ -87,7 +87,7 @@
       <p class="hint">{{localize "ACKS-HENCHMEN.special.hint"}}</p>
       {{#if directedRows.length}}
       <h4 class="bucket-header">{{localize "ACKS-HENCHMEN.special.directed"}} ({{directedRows.length}})</h4>
-      <table class="candidates-table">
+      <table class="candidates-table acks-table acks-table--compact acks-table--interactive">
         <thead>
           <tr>
             <th>{{localize "ACKS-HENCHMEN.candidate.name"}}</th>
@@ -125,7 +125,7 @@
       {{/if}}
       {{#if specialHires.length}}
       <h4 class="bucket-header">{{localize "ACKS-HENCHMEN.special.actors"}} ({{specialHires.length}})</h4>
-      <table class="candidates-table">
+      <table class="candidates-table acks-table acks-table--compact acks-table--interactive">
         <thead>
           <tr>
             <th>{{localize "ACKS-HENCHMEN.candidate.name"}}</th>
@@ -214,7 +214,7 @@
   {{!-- ------------------------- Mercenaries ------------------------- --}}
   <section class="tab location-tab {{tabs.mercenaries.cssClass}}" data-group="primary" data-tab="mercenaries">
     <div class="bucket-actions">
-      <button type="button" data-action="hireGroup" data-tooltip="{{localize 'ACKS-HENCHMEN.group.hireHint'}}">
+      <button type="button" class="acks-btn acks-btn--secondary" data-action="hireGroup" data-tooltip="{{localize 'ACKS-HENCHMEN.group.hireHint'}}">
         <i class="fas fa-flag"></i> {{localize "ACKS-HENCHMEN.group.hireAsGroup"}}
       </button>
     </div>
@@ -404,7 +404,7 @@
   <section class="tab location-tab {{tabs.gmView.cssClass}}" data-group="primary" data-tab="gmView">
     <p class="hint">{{localize "ACKS-HENCHMEN.market.hint"}}</p>
     {{#if market.length}}
-    <table class="market-table">
+    <table class="market-table acks-table acks-table--compact acks-table--interactive">
       <thead>
         <tr>
           <th>{{localize "ACKS-HENCHMEN.market.segment"}}</th>
@@ -432,7 +432,7 @@
 
     <details class="section">
       <summary>{{localize "ACKS-HENCHMEN.location.ledger"}} ({{ledgerTotal}} gp)</summary>
-      <table class="ledger-table">
+      <table class="ledger-table acks-table acks-table--compact">
         <tbody>
           {{#each ledger}}
           <tr><td>{{gp}} gp</td><td>{{postingId}}</td></tr>
@@ -444,7 +444,7 @@
     <details class="section">
       <summary>{{localize "ACKS-HENCHMEN.location.marketLog"}} ({{marketLog.length}})</summary>
       <p class="hint">{{localize "ACKS-HENCHMEN.location.marketLogHint"}}</p>
-      <table class="ledger-table">
+      <table class="ledger-table acks-table acks-table--compact">
         <tbody>
           {{#each marketLog}}
           <tr><td>{{typeLabel}}</td><td>{{note}}</td><td class="hint">{{when}}</td></tr>

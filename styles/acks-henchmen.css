@@ -191,24 +191,26 @@
   margin-top: 0.25rem;
 }
 
-.acks-henchmen.location-sheet .market-class-badge {
-  padding: 0.1em 0.5em;
-  border: 1px solid var(--color-border-dark-tertiary, #7a7971);
-  border-radius: 3px;
-}
+/* .market-class-badge now rides acks-design's .acks-tag (applied in the template). */
 
 .acks-henchmen.location-sheet details.section {
-  border: 1px solid var(--color-border-light-tertiary, #b5b3a4);
-  border-radius: 4px;
+  border: 1px solid var(--acks-rule-color-soft, rgba(98, 7, 48, 0.35));
+  border-radius: var(--acks-radius, 0);
   padding: 0.25rem 0.5rem;
+  margin-block: 0.25rem;
 }
 
 .acks-henchmen.location-sheet details.section > summary {
   cursor: pointer;
-  font-weight: bold;
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  font-family: var(--acks-font-display, "Cinzel", serif);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--acks-tracking-caps, 0.07em);
+  font-size: var(--acks-fs-label, 0.9em);
+  color: var(--acks-spot, #620730);
 }
 
 .acks-henchmen.location-sheet .inline-add {
@@ -224,21 +226,7 @@
   gap: 0.25rem 1rem;
 }
 
-.acks-henchmen.location-sheet table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.92em;
-}
-
-.acks-henchmen.location-sheet th {
-  text-align: left;
-  border-bottom: 1px solid var(--color-border-dark-tertiary, #7a7971);
-}
-
-.acks-henchmen.location-sheet td {
-  padding: 0.15rem 0.25rem;
-  vertical-align: middle;
-}
+/* Tables are styled by acks-design's .acks-table component (applied in the template). */
 
 .acks-henchmen.location-sheet tr.inactive,
 .acks-henchmen.location-sheet tr.status-withdrawn,
@@ -439,35 +427,13 @@
 /* Long-running advert: the post "changes color" (RAW designation) — the
    whole location's search for that thing eases one rarity while it runs. */
 .acks-henchmen.location-sheet tr.advert-veteran td:first-child {
-  color: var(--color-text-hyperlink, #1c60a5);
+  color: var(--acks-spot, #620730);
 }
 .acks-henchmen.location-sheet tr.advert-veteran .fa-bullhorn {
-  color: var(--color-text-hyperlink, #1c60a5);
+  color: var(--acks-spot, #620730);
 }
 
-/* Location sheet tabs (Recruitment / Henchmen / Mercs / Specialists / GM) */
-.acks-henchmen.location-sheet nav.sheet-tabs {
-  display: flex;
-  gap: 0.25rem;
-  flex-wrap: wrap;
-  border-bottom: 2px solid var(--color-border-light-primary, #782e22);
-  margin: 0.35rem 0 0.5rem 0;
-  padding-bottom: 0;
-}
-.acks-henchmen.location-sheet nav.sheet-tabs a {
-  padding: 0.2rem 0.6rem;
-  border: 1px solid var(--color-border-light-tertiary, #b5b3a4);
-  border-bottom: none;
-  border-radius: 4px 4px 0 0;
-  background: rgba(0, 0, 0, 0.04);
-  font-size: var(--font-size-13, 13px);
-  white-space: nowrap;
-}
-.acks-henchmen.location-sheet nav.sheet-tabs a.active {
-  background: var(--color-border-light-primary, #782e22);
-  color: #fff;
-  font-weight: bold;
-}
+/* Location sheet tabs are styled by acks-design's foundry.css (.acks-ui .sheet-tabs). */
 .acks-henchmen.location-sheet section.location-tab:not(.active) {
   display: none;
 }
@@ -479,7 +445,7 @@
 /* Directed-search replacement: the candidate your search found — starred
    and tinted for the posting recruiter, available the whole month. */
 .acks-henchmen.location-sheet tr.search-hit td:first-child {
-  color: var(--color-text-hyperlink, #1c60a5);
+  color: var(--acks-spot, #620730);
   font-weight: bold;
 }
 .acks-henchmen.location-sheet tr.search-hit .fa-star {

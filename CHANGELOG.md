@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.27.0
+
+- **The location (market / recruitment) sheet adopts the acks-design look.** The
+  sheet opts into acks-lib's vendored acks-design layer by carrying `.acks-ui` on
+  its root, so its window header becomes the porphyry running-head, its tabs the
+  ruled ACKS tabs, and its inputs / labels / hints / collapsible sections the
+  printed-book style — no per-element work. Its tables now use the `.acks-table`
+  component (porphyry header row, zebra body, hairline column rules), the
+  market-class chips become `.acks-tag`, the collapsible section headers become
+  Cinzel caps, and the header buttons become `.acks-btn`. The acks-design layer is
+  provided by acks-lib (vendored from the local design reference), so the look is
+  available to the rest of the family too.
+
 ## 0.26.0
 
 - **Monster hirelings now appear in the employer's Hirelings tab** alongside
