@@ -84,6 +84,16 @@ notice. This module is **not a substitute for the books**.
 5. Loyalty automation runs from there: calamity prompts, level-up rolls,
    wages — all whispered to the GM first (secret rolls per the book).
 
+**Pre-existing henchmen** — actors that were already someone's retainer
+before this module arrived — are **adopted automatically**: the first time
+the module sees them (on load, or when wages come due) their wage clock
+starts from that day, they owe nothing for the months before, and the roster
+lists their origin as *Pre-existing*. Wages the employer cannot cover are
+simply not paid — nothing is marked missed and no calamity fires unless the
+GM presses *Mark missed* deliberately. If a world was hit by the old
+epoch-billing bug (absurd arrears + unearned calamities), the **Forgive Wage
+Arrears (Repair)** macro reverses the damage in one pass.
+
 ## Development
 
 ```

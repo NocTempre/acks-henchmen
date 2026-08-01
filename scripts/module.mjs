@@ -34,7 +34,7 @@ import * as identityRules from "./rules/identity.mjs";
 import { onTimeAdvanced, advanceDays, now } from "./time.mjs";
 import { bindCardListeners, registerCardAction } from "./chat/cards.mjs";
 import { registerSockets, executeAsGM, registerSocketAction } from "./sockets.mjs";
-import { registerEventEngine, openLoyaltyRoll, openObedienceRoll, recordCalamity, payWagesFor, effectiveLoyaltyFor, effectiveMoraleFor } from "./engine/events.mjs";
+import { registerEventEngine, openLoyaltyRoll, openObedienceRoll, recordCalamity, payWagesFor, enrollNewcomers, forgiveWageDebts, allEmployers, effectiveLoyaltyFor, effectiveMoraleFor } from "./engine/events.mjs";
 import { openRosterApp } from "./apps/roster-app.mjs";
 import { installHirelingsGrid } from "./apps/hirelings-grid.mjs";
 import { recruitMonster, hireMonster, validateMonsterRecruit } from "./engine/monster.mjs";
@@ -131,6 +131,9 @@ Hooks.once("setup", async () => {
     openObedienceRoll,
     recordCalamity,
     payWagesFor,
+    enrollNewcomers,
+    forgiveWageDebts,
+    allEmployers,
     effectiveLoyaltyFor,
     effectiveMoraleFor,
     // monsters, followers, integrations
@@ -193,6 +196,15 @@ Hooks.once("ready", () => {
   registerInfluenceIntegration();
 
   if (getSetting("autoRepairReferences")) sweepAtReady();
+
+  // Adopt pre-existing henchmen the moment the module can see them, not on
+  // the first time-advance: their wage clocks start from install day, so the
+  // first prompt they ever appear in is an honest one month from now.
+  if (game.user === game.users.activeGM) {
+    (async () => {
+      for (const employer of allEmployers()) await enrollNewcomers(employer);
+    })().catch((err) => console.error(`${MODULE_ID} | adopting pre-existing hirelings failed`, err));
+  }
 
   // Book tables are imported per-world, not shipped. If acks-lib is missing or
   // some documents have not been imported yet, tell the GM once and name them.

@@ -345,6 +345,34 @@ acksHenchmen.openThrowDialog("hirelingObedience", {
 });`
     ),
     macro(
+      "Forgive Wage Arrears (Repair)",
+      "icons/svg/heal.svg",
+      `// Repair for worlds hit by the epoch-billing bug (pre-existing henchmen
+// invoiced for every month since worldTime zero and hit with calamities when
+// the bill bounced), or for a Judge simply writing off back wages: zeroes
+// wage arrears, removes the loyalty penalties recorded for MISSED WAGES
+// (other calamities are untouched), fixes the calamity counters, and
+// re-derives effective loyalty. Groups get their arrears zeroed too.
+if (!game.user.isGM) return ui.notifications.warn("Only a GM can forgive wage debts.");
+const selected = canvas.tokens.controlled.map((t) => t.actor).filter(Boolean);
+const employers = selected.length ? selected : acksHenchmen.allEmployers();
+if (!employers.length) return ui.notifications.info("No employers found.");
+const names = employers.map((e) => e.name).join(", ");
+const ok = await foundry.applications.api.DialogV2.confirm({
+  window: { title: "Forgive wage arrears?" },
+  content: \`<p>Forgive all recorded wage arrears and missed-wage loyalty penalties for the hirelings and units of: <b>\${names}</b>?</p>
+    <p class="notes">Select employer tokens first to limit the sweep; with nothing selected it covers every employer in the world. Unit morale drops are left for you to judge.</p>\`,
+  rejectClose: false,
+});
+if (!ok) return;
+let hirelings = 0, groups = 0, gp = 0, calamities = 0;
+for (const employer of employers) {
+  const s = await acksHenchmen.forgiveWageDebts(employer);
+  hirelings += s.hirelings; groups += s.groups; gp += s.arrearsGp; calamities += s.calamities;
+}
+ui.notifications.info(\`Forgiven: \${gp} gp of arrears across \${hirelings} hireling(s) and \${groups} unit(s); \${calamities} missed-wage calamity(ies) reversed.\`);`
+    ),
+    macro(
       "Repair Henchmen References",
       "icons/svg/repair.svg",
       `// Fixes the core acks 14.0.1 crash where a character sheet fails to render

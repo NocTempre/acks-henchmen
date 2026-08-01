@@ -260,13 +260,19 @@ function dueHirelings(employer, currentTime) {
     if (!actor || !adapter.isRetainer(actor)) continue;
     const record = actor.getFlag(MODULE_ID, FLAG_RECORD) ?? {};
     if (record.terms?.vassalDomain) continue; // domain income covers the wage
-    const last = record.terms?.lastPaidTime ?? record.hiredTime ?? 0;
+    const last = record.terms?.lastPaidTime ?? record.hiredTime;
+    // No timestamp at all = a pre-existing henchman the module never enrolled
+    // (hand-made long before install, retainer.enabled set by hand). Billing
+    // them from `?? 0` meant every month since worldTime ZERO — six-figure
+    // invoices and a calamity for a debt the module invented. They owe
+    // nothing until enrollNewcomers() starts their clock from today.
+    if (last == null) continue;
     const months = Math.floor((currentTime - last) / secondsPerMonth());
     if (months >= 1) {
       const retainer = adapter.getRetainer(actor);
       const monthly =
         (Number(record.terms?.wageGp ?? retainer.wage) || henchmanWage(adapter.getWageLevel(actor))) *
-        Math.max(1, retainer.quantity);
+        Math.max(1, Number(retainer.quantity) || 1);
       due.push({ actor, record, months, monthly, amount: monthly * months, paidThrough: last + months * secondsPerMonth() });
     }
   }
@@ -295,7 +301,8 @@ function dueGroups(employer, currentTime) {
     const monthly = groupMonthlyWage(group);
     if (monthly <= 0) continue;
     const pay = group.getFlag(MODULE_ID, FLAG_GROUP_PAY) ?? {};
-    const last = pay.lastPaidTime ?? 0;
+    const last = pay.lastPaidTime;
+    if (last == null) continue; // same epoch trap as dueHirelings — enrollNewcomers starts the clock
     const months = Math.floor((currentTime - last) / secondsPerMonth());
     if (months >= 1) {
       due.push({ isGroup: true, group, months, monthly, amount: monthly * months, paidThrough: last + months * secondsPerMonth() });
@@ -311,6 +318,100 @@ async function adjustGroupMorale(group, delta) {
 }
 
 /**
+ * Adopt every managed hireling/group of `employer` the module has never
+ * enrolled: anything with retainer.enabled and no lastPaidTime/hiredTime gets
+ * its wage clock started from `currentTime`. Pre-existing henchmen paid
+ * off-books before the module arrived owe nothing for that past — the first
+ * wage prompt they appear in is one month from TODAY. Runs ahead of every
+ * due computation and once at ready, and is idempotent.
+ */
+export async function enrollNewcomers(employer, currentTime = now()) {
+  const ids = [...adapter.getHenchmenIds(employer), ...(employer.getFlag(MODULE_ID, "monsterHenchmenList") ?? [])];
+  for (const id of ids) {
+    const actor = game.actors.get(id);
+    if (!actor || !adapter.isRetainer(actor)) continue;
+    const record = actor.getFlag(MODULE_ID, FLAG_RECORD) ?? {};
+    if (record.terms?.lastPaidTime != null || record.hiredTime != null) continue;
+    await actor.setFlag(MODULE_ID, FLAG_RECORD, {
+      ...record,
+      hiredTime: currentTime,
+      origin: record.origin ?? "adopted",
+      terms: { ...(record.terms ?? {}), lastPaidTime: currentTime, arrearsGp: record.terms?.arrearsGp ?? 0 },
+    });
+    await HenchmanRecord.logEvent(actor, { type: "adopted" });
+    console.log(`${MODULE_ID} | adopted pre-existing hireling "${actor.name}" — wage clock starts now.`);
+  }
+  for (const group of game.actors.filter((a) => a.type === GROUP_TYPE && a.system?.unit?.employerUuid === employer.uuid)) {
+    const pay = group.getFlag(MODULE_ID, FLAG_GROUP_PAY) ?? {};
+    if (pay.lastPaidTime != null) continue;
+    await group.setFlag(MODULE_ID, FLAG_GROUP_PAY, { ...pay, lastPaidTime: currentTime, arrearsGp: pay.arrearsGp ?? 0 });
+    console.log(`${MODULE_ID} | adopted pre-existing unit "${group.name}" — wage clock starts now.`);
+  }
+}
+
+/** Every potential employer in the world (mirrors checkWagesDue's filter). */
+export function allEmployers() {
+  const anyGroups = game.actors.some((g) => g.type === GROUP_TYPE);
+  return game.actors.filter(
+    (a) =>
+      a.type === "character" &&
+      !a.system?.retainer?.enabled &&
+      (a.system?.henchmenList?.length ||
+        (a.getFlag(MODULE_ID, "monsterHenchmenList") ?? []).length ||
+        (anyGroups && game.actors.some((g) => g.type === GROUP_TYPE && g.system?.unit?.employerUuid === a.uuid))),
+  );
+}
+
+/**
+ * Repair: forgive the wage debts the module recorded — for worlds where the
+ * epoch-billing bug (or plain fiction) left absurd arrears and unearned
+ * calamities. Per hireling of `employer`: zero `terms.arrearsGp`, remove the
+ * loyalty permanents recorded for missed wages (reason "calamity", the
+ * missed-wages note), decrement the calamity counter by those removed, and
+ * re-derive effective loyalty. Groups get their arrears zeroed (their morale
+ * drop is left to the GM — it may have been earned since). Other calamities
+ * (wounds, deaths) are untouched.
+ */
+export async function forgiveWageDebts(employer) {
+  const wageNote = game.i18n.localize("ACKS-HENCHMEN.wage.missedCalamity");
+  const summary = { hirelings: 0, arrearsGp: 0, calamities: 0, groups: 0 };
+  const ids = [...adapter.getHenchmenIds(employer), ...(employer.getFlag(MODULE_ID, "monsterHenchmenList") ?? [])];
+  for (const id of ids) {
+    const actor = game.actors.get(id);
+    if (!actor) continue;
+    const record = actor.getFlag(MODULE_ID, FLAG_RECORD) ?? {};
+    const permanents = record.loyalty?.permanents ?? [];
+    const kept = permanents.filter((p) => !(p.reason === "calamity" && p.note === wageNote));
+    const removed = permanents.length - kept.length;
+    const arrears = Number(record.terms?.arrearsGp ?? 0);
+    if (!removed && !arrears) continue;
+    await actor.setFlag(MODULE_ID, FLAG_RECORD, {
+      ...record,
+      terms: { ...(record.terms ?? {}), arrearsGp: 0 },
+      loyalty: { ...(record.loyalty ?? {}), permanents: kept },
+      counters: {
+        ...(record.counters ?? {}),
+        calamities: Math.max(0, Number(record.counters?.calamities ?? 0) - removed),
+      },
+    });
+    await syncLoyalty(actor);
+    await HenchmanRecord.logEvent(actor, { type: "wagesForgiven", note: arrears ? `${arrears} gp` : "" });
+    summary.hirelings++;
+    summary.arrearsGp += arrears;
+    summary.calamities += removed;
+  }
+  for (const group of game.actors.filter((a) => a.type === GROUP_TYPE && a.system?.unit?.employerUuid === employer.uuid)) {
+    const pay = group.getFlag(MODULE_ID, FLAG_GROUP_PAY) ?? {};
+    const arrears = Number(pay.arrearsGp ?? 0);
+    if (!arrears) continue;
+    await group.setFlag(MODULE_ID, FLAG_GROUP_PAY, { ...pay, arrearsGp: 0 });
+    summary.groups++;
+    summary.arrearsGp += arrears;
+  }
+  return summary;
+}
+
+/**
  * Pay all due wages for one employer: gold LEAVES the employer and LANDS on
  * each hireling — into their bank unless the `wagesToBank` setting is off.
  * Paid GROUPS are billed too (gold leaves the employer; a unit has no bank),
@@ -318,6 +419,7 @@ async function adjustGroupMorale(group, delta) {
  */
 export async function payWagesFor(employer, { markMissed = false } = {}) {
   const currentTime = now();
+  await enrollNewcomers(employer, currentTime);
   const due = [...dueHirelings(employer, currentTime), ...dueGroups(employer, currentTime)];
   if (!due.length) {
     ui.notifications.info(game.i18n.format("ACKS-HENCHMEN.wage.nothingDue", { name: employer.name }));
@@ -326,7 +428,11 @@ export async function payWagesFor(employer, { markMissed = false } = {}) {
   const total = due.reduce((s, d) => s + d.amount, 0);
   if (!markMissed) {
     const paid = await adapter.spendGold(employer, total, game.i18n.format("ACKS-HENCHMEN.wage.reason", { count: due.length }));
-    if (!paid) markMissed = true; // insufficient funds → wages missed
+    // Insufficient funds is a STOP, not a silent slide into "missed": no
+    // payday recorded, no arrears, no calamity. spendGold already told the
+    // table who cannot pay what; the GM can sell something and press Pay
+    // again, pay by hand, or press "Mark missed" meaning it.
+    if (!paid) return;
   }
   const toBank = getSetting("wagesToBank");
   for (const d of due) {
@@ -372,19 +478,15 @@ export async function payWagesFor(employer, { markMissed = false } = {}) {
 /** Whisper per-employer wages-due cards (time watcher). */
 async function checkWagesDue(currentTime) {
   if (!getSetting("wageReminders")) return;
-  const anyGroups = game.actors.some((g) => g.type === GROUP_TYPE);
-  const employers = game.actors.filter(
-    (a) =>
-      a.type === "character" &&
-      !a.system?.retainer?.enabled &&
-      (a.system?.henchmenList?.length ||
-        (a.getFlag(MODULE_ID, "monsterHenchmenList") ?? []).length ||
-        (anyGroups && game.actors.some((g) => g.type === GROUP_TYPE && g.system?.unit?.employerUuid === a.uuid)))
-  );
-  for (const employer of employers) {
-    const due = dueHirelings(employer, currentTime);
+  for (const employer of allEmployers()) {
+    await enrollNewcomers(employer, currentTime);
+    // The same list Pay will bill — groups included — and the same Σ amount,
+    // so the card can never promise one figure and charge another. (It used
+    // to reduce over `d.wage`, a key dueHirelings never wrote: NaN on every
+    // card, in every world.)
+    const due = [...dueHirelings(employer, currentTime), ...dueGroups(employer, currentTime)];
     if (!due.length) continue;
-    const total = due.reduce((s, d) => s + d.wage, 0);
+    const total = due.reduce((s, d) => s + d.amount, 0);
     await postEventCard({
       titleKey: "ACKS-HENCHMEN.wage.dueTitle",
       bodyKey: "ACKS-HENCHMEN.wage.dueBody",

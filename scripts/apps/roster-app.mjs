@@ -90,8 +90,10 @@ export class RosterApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const record = actor.getFlag(MODULE_ID, FLAG_RECORD) ?? {};
         const retainer = adapter.getRetainer(actor);
         const wage = Number(record.terms?.wageGp ?? retainer.wage) || henchmanWage(adapter.getWageLevel(actor));
-        const lastPaid = record.terms?.lastPaidTime ?? record.hiredTime ?? 0;
-        const monthsDue = Math.floor((currentTime - lastPaid) / secondsPerMonth());
+        const lastPaid = record.terms?.lastPaidTime ?? record.hiredTime;
+        // Never derive months from the epoch: an unenrolled pre-existing
+        // henchman owes nothing until the wage engine adopts them.
+        const monthsDue = lastPaid == null ? 0 : Math.floor((currentTime - lastPaid) / secondsPerMonth());
         const permanents = (record.loyalty?.permanents ?? []).reduce((s, p) => s + Number(p.delta ?? 0), 0);
         return {
           id: actor.id,
