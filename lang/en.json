@@ -473,6 +473,7 @@
   "ACKS-HENCHMEN.ledger.compensateHint": "Mark compensated — the wound is healed or restitution made, so this stops counting toward the score. The entry stays on record and can be restored.",
   "ACKS-HENCHMEN.ledger.restoreHint": "Restore this adjustment — it counts toward the score again.",
   "ACKS-HENCHMEN.ledger.compensatedTag": "Compensated — no longer counts toward the score",
+  "ACKS-HENCHMEN.ledger.gmOnly": "Only the Judge can compensate or restore a loyalty adjustment.",
   "ACKS-HENCHMEN.ledger.compensatedNote": "Compensated: {delta} {reason}",
   "ACKS-HENCHMEN.ledger.restoredNote": "Restored: {delta} {reason}",
   "ACKS-HENCHMEN.monster.hdCap": "A monster of {hd} HD cannot serve an employer of level {level} — its HD must be LOWER than the employer's level (MM 351).",

@@ -71,8 +71,13 @@ export async function addLoyaltyPermanent(actor, delta, reason, note = "") {
  * Suspend or restore one ledger entry (RR 166: a wound or tampering penalty
  * applies only "while uncompensated"). The entry STAYS in the ledger — it
  * simply stops counting toward the effective score — so the history remains
- * readable and the Judge can undo the ruling. Always a GM decision: nothing
- * in the module compensates an entry on its own.
+ * readable and the Judge can undo the ruling.
+ *
+ * GM-ONLY, and enforced here rather than only in the roster template: a
+ * hireling's OWNER is usually the player, so Foundry's own permissions would
+ * happily let them suspend their own loyalty penalties from the console.
+ * Loyalty is secret Judge information (every roll in this module is
+ * whispered), so the ruling is the GM's alone.
  * @param {Actor} actor
  * @param {object} opts
  * @param {"loyalty"|"morale"} [opts.track="loyalty"] - which ledger
@@ -81,6 +86,10 @@ export async function addLoyaltyPermanent(actor, delta, reason, note = "") {
  * @returns {Promise<boolean>} whether anything changed
  */
 export async function setPermanentCompensated(actor, { track = "loyalty", index, compensated = true } = {}) {
+  if (!game.user.isGM) {
+    ui.notifications.warn(game.i18n.localize("ACKS-HENCHMEN.ledger.gmOnly"));
+    return false;
+  }
   if (track !== "loyalty" && track !== "morale") return false;
   const record = actor.getFlag(MODULE_ID, FLAG_RECORD) ?? {};
   const permanents = [...(record[track]?.permanents ?? [])];

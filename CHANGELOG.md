@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.29.1
+
+- **The compensate toggle is now GM-only in the engine, not just the UI.**
+  A hireling's owner is normally the player, so Foundry's permissions let an
+  owning player call `setPermanentCompensated` from the console and suspend
+  their own loyalty penalties — loyalty being secret Judge information. The
+  function refuses non-GM callers and warns; the roster template was already
+  GM-gated.
+
 ## 0.29.0
 
 - **Compensated penalties now actually stop counting (RR 166).** The ledger
