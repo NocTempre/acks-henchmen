@@ -38,7 +38,15 @@ async function gridifyHirelings(app, element) {
 
   // Buckets from the employer: character hirelings + monster henchmen (category
   // "henchman"), so monsters appear in the list alongside the rest.
-  const buckets = employer.getHirelings?.() ?? {};
+  // Core's getHirelings returns `foundry.utils.duplicate()` SNAPSHOTS, not live
+  // actors: no Item collection and no prepared derived data, so a card built from
+  // one shows AC 0, no encumbrance and an unarmed/improvised attack list while the
+  // hireling's own sheet shows its real gear. Resolve each back to its document.
+  const live = (h) => game.actors.get(h?._id ?? h?.id) ?? null;
+  const rawBuckets = employer.getHirelings?.() ?? {};
+  const buckets = Object.fromEntries(
+    Object.entries(rawBuckets).map(([k, list]) => [k, (list ?? []).map(live).filter(Boolean)]),
+  );
   const monsters = (employer.getFlag(MODULE_ID, FLAG_MONSTER_LIST) ?? [])
     .map((id) => game.actors.get(id))
     .filter((a) => a && a.type === "monster");

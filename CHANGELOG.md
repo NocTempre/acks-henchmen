@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.27.1
+
+- **Fixed: the hirelings-tab cards did not match the hireling’s own sheet.** Core’s
+  `getHirelings()` hands back `foundry.utils.duplicate()` SNAPSHOTS rather than
+  live actors — no Item collection and no prepared derived data — so a card built
+  from one showed AC 0, no encumbrance, and an unarmed/improvised attack list while
+  the same henchman’s own card showed his real gear. The grid now resolves each
+  entry back to its Actor document, and the two cards agree.
+
 ## 0.27.0
 
 - **The location (market / recruitment) sheet adopts the acks-design look.** The
