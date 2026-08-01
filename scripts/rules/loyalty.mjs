@@ -2,7 +2,7 @@
  * Loyalty & morale bookkeeping rules (RR 166-167). Pure module.
  *
  * The stored data shape is HenchmanRecord (scripts/data/henchman-record.mjs):
- *   loyalty: { start, permanents: [{time, delta, reason, note}] }
+ *   loyalty: { start, permanents: [{time, delta, reason, note, compensated}] }
  *   morale:  { base, permanents: [...] }
  * Employer-derived pieces (CHA, effect bonuses) are computed at read time so
  * transfers between employers recalculate automatically (RR 163).
@@ -14,6 +14,30 @@ export function clampScore(v) {
 }
 
 /**
+ * Whether a ledger entry still counts. RR 166 penalties apply "while
+ * uncompensated": the Judge marks one `compensated` and it stops scoring
+ * without leaving the ledger, so the history stays readable and the ruling
+ * is reversible.
+ */
+export function isActivePermanent(entry) {
+  return !entry?.compensated;
+}
+
+/** Σ of the deltas that still apply (compensated entries are suspended). */
+export function sumPermanents(permanents = []) {
+  return permanents.reduce((s, p) => (isActivePermanent(p) ? s + Number(p.delta ?? 0) : s), 0);
+}
+
+/**
+ * i18n key labelling a ledger entry's reason. The two tracks have separate
+ * vocabularies (config LOYALTY_REASONS / MORALE_REASONS) — a level bump is a
+ * morale reason, a calamity a loyalty one.
+ */
+export function reasonKey(track, reason) {
+  return `ACKS-HENCHMEN.${track === "morale" ? "morale" : "loyalty"}Reason.${reason}`;
+}
+
+/**
  * Effective loyalty score = start + Σ permanents + employer CHA loyalty mod
  * + employer baseLoyalty effect bonuses (Blood of Kings…), clamped -4..+4.
  * @param {object} record - HenchmanRecord-shaped plain object
@@ -21,7 +45,7 @@ export function clampScore(v) {
  */
 export function effectiveLoyalty(record, employer) {
   const start = Number(record?.loyalty?.start ?? 0);
-  const permanents = (record?.loyalty?.permanents ?? []).reduce((s, p) => s + Number(p.delta ?? 0), 0);
+  const permanents = sumPermanents(record?.loyalty?.permanents ?? []);
   return clampScore(start + permanents + (employer?.chaLoyalty ?? 0) + (employer?.baseLoyaltyBonus ?? 0));
 }
 
@@ -31,7 +55,7 @@ export function effectiveLoyalty(record, employer) {
  */
 export function effectiveMorale(record, fallbackBase = 0) {
   const base = Number(record?.morale?.base ?? fallbackBase);
-  const permanents = (record?.morale?.permanents ?? []).reduce((s, p) => s + Number(p.delta ?? 0), 0);
+  const permanents = sumPermanents(record?.morale?.permanents ?? []);
   return clampScore(base + permanents);
 }
 
@@ -48,10 +72,11 @@ export function outcomeLeavesService(outcome) {
 }
 
 /**
- * Wound-based loyalty penalties until cured or compensated (RR 166):
- * critical -1, grievous -2, mortal -3; tampering side effects: moderate -1,
- * major -2. These are stored as permanents with reason "wound"/"tampering"
- * and removed when compensated (delta reversed with a note).
+ * Loyalty penalties that last only "while uncompensated" (RR 166): permanent
+ * wounds critical -1, grievous -2, mortal -3; tampering-with-mortality side
+ * effects moderate -1, major -2. The Judge records one from the roster
+ * (reason "wound"/"tampering"), and lifts it by marking that ledger entry
+ * compensated once the wound is healed or restitution is made.
  */
 export const WOUND_PENALTIES = Object.freeze({
   critical: -1,
@@ -60,6 +85,11 @@ export const WOUND_PENALTIES = Object.freeze({
   tamperingModerate: -1,
   tamperingMajor: -2,
 });
+
+/** Which ledger reason a WOUND_PENALTIES key is recorded under. */
+export function penaltyReason(key) {
+  return String(key).startsWith("tampering") ? "tampering" : "wound";
+}
 
 /**
  * Starting loyalty for a new hire.

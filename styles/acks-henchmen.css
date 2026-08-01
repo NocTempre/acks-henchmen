@@ -413,15 +413,45 @@
   padding: 0.25rem 0.5rem 0.25rem 2.3rem;
 }
 
-.acks-henchmen.roster-app .event-log {
+.acks-henchmen.roster-app .event-log,
+.acks-henchmen.roster-app .loyalty-ledger {
   width: 100%;
   font-size: 0.85em;
   border-collapse: collapse;
 }
 
-.acks-henchmen.roster-app .event-log td {
+.acks-henchmen.roster-app .event-log td,
+.acks-henchmen.roster-app .loyalty-ledger td {
   padding: 0.1rem 0.3rem;
   border-top: 1px dotted var(--color-border-light-tertiary, #b5b3a4);
+}
+
+.acks-henchmen.roster-app .loyalty-ledger caption {
+  text-align: left;
+  font-weight: bold;
+  opacity: 0.8;
+}
+
+.acks-henchmen.roster-app .loyalty-ledger .ledger-track {
+  width: 4.5em;
+  opacity: 0.7;
+}
+
+.acks-henchmen.roster-app .loyalty-ledger .ledger-delta {
+  width: 2.5em;
+  text-align: right;
+  font-weight: bold;
+}
+
+.acks-henchmen.roster-app .loyalty-ledger .ledger-toggle {
+  width: 1.5em;
+  text-align: right;
+}
+
+/* Compensated (RR 166): the entry stays on record but no longer scores. */
+.acks-henchmen.roster-app .loyalty-ledger tr.compensated td:not(.ledger-toggle) {
+  text-decoration: line-through;
+  opacity: 0.6;
 }
 
 /* Long-running advert: the post "changes color" (RAW designation) — the

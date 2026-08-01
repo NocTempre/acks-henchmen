@@ -47,7 +47,13 @@ Serialized DataModel at `actor.flags["acks-henchmen"].record`
   `arrearsGp`, `vassalDomain`
 - `loyalty {start, permanents[]}` / `morale {base, permanents[]}` — the
   ledgers; **effective scores are computed at read time** (base + permanents +
-  employer CHA + employer effect bonuses) so transfers recalculate (RR 163)
+  employer CHA + employer effect bonuses) so transfers recalculate (RR 163).
+  Each entry carries `compensated`: RR 166 penalties (permanent wounds,
+  tampering side effects) apply only *while uncompensated*, so the Judge
+  suspends one from the roster ledger and it stops scoring **without leaving
+  the record**. Nothing sets it on its own — not even the wage-arrears repair,
+  which compensates instead of deleting so the forgiveness stays auditable and
+  reversible
 - `counters {calamities, levelsGainedInService, startLevel}`
 - `events[]` — capped log (hired, calamity, rolls, wages, wounds, transfer…)
 - `special {skipCalamityLoyalty, noSlot, pendingCalamity, irrefusableResult}`

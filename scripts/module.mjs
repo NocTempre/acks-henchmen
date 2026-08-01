@@ -34,7 +34,7 @@ import * as identityRules from "./rules/identity.mjs";
 import { onTimeAdvanced, advanceDays, now } from "./time.mjs";
 import { bindCardListeners, registerCardAction } from "./chat/cards.mjs";
 import { registerSockets, executeAsGM, registerSocketAction } from "./sockets.mjs";
-import { registerEventEngine, openLoyaltyRoll, openObedienceRoll, recordCalamity, payWagesFor, enrollNewcomers, forgiveWageDebts, allEmployers, effectiveLoyaltyFor, effectiveMoraleFor } from "./engine/events.mjs";
+import { registerEventEngine, openLoyaltyRoll, openObedienceRoll, recordCalamity, payWagesFor, enrollNewcomers, forgiveWageDebts, setPermanentCompensated, allEmployers, effectiveLoyaltyFor, effectiveMoraleFor } from "./engine/events.mjs";
 import { openRosterApp } from "./apps/roster-app.mjs";
 import { installHirelingsGrid } from "./apps/hirelings-grid.mjs";
 import { recruitMonster, hireMonster, validateMonsterRecruit } from "./engine/monster.mjs";
@@ -133,6 +133,7 @@ Hooks.once("setup", async () => {
     payWagesFor,
     enrollNewcomers,
     forgiveWageDebts,
+    setPermanentCompensated,
     allEmployers,
     effectiveLoyaltyFor,
     effectiveMoraleFor,

@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.29.0
+
+- **Compensated penalties now actually stop counting (RR 166).** The ledger
+  has carried a `compensated` flag since the schema was written, but the score
+  summed every entry regardless and nothing ever set it. Effective loyalty and
+  morale now skip compensated entries, so a penalty lifted by healing or
+  restitution stops applying — while staying on the record.
+- **Roster: a permanent-adjustment ledger per hireling.** Expanding a roster
+  row lists every loyalty and morale adjustment with its reason; the GM
+  compensates or restores each with one click (struck through while
+  compensated). Players see the list read-only.
+- **Roster: record a wound or tampering penalty.** The RR 166 penalties that
+  apply only while uncompensated — critical −1 / grievous −2 / mortal −3,
+  moderate −1 / major −2 tampering-with-mortality side effects — are now
+  recordable from the roster, instead of being a table the code never read.
+- **Forgive Wage Arrears no longer deletes ledger entries**: it marks the
+  missed-wage penalties compensated, so the forgiveness is visible, auditable,
+  and reversible from the roster. Re-running it changes nothing.
+- `api.setPermanentCompensated(actor, {track, index, compensated})` for macros.
+
 ## 0.28.0
 
 - **Wage cards never say NaN again.** The due card totalled a key the

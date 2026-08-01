@@ -17,13 +17,41 @@ import {
   effectiveMoraleFor,
   employerLoyaltyMods,
   addLoyaltyPermanent,
+  setPermanentCompensated,
   syncLoyalty,
 } from "../engine/events.mjs";
+import { sumPermanents, reasonKey, WOUND_PENALTIES, penaltyReason } from "../rules/loyalty.mjs";
 import { henchmanWage } from "../rules/wages.mjs";
 import * as adapter from "../acks-adapter.mjs";
 import { now, secondsPerMonth } from "../time.mjs";
 
 const { HandlebarsApplicationMixin, ApplicationV2 } = foundry.applications.api;
+
+/**
+ * Both permanent-adjustment ledgers as display rows, newest first, each
+ * carrying the coordinates the compensate toggle writes back through
+ * (`track` + `index` into that track's stored array).
+ */
+function ledgerRows(record) {
+  return ["loyalty", "morale"].flatMap((track) =>
+    (record[track]?.permanents ?? [])
+      .map((entry, index) => {
+        const delta = Number(entry.delta ?? 0);
+        return {
+          track,
+          index,
+          compensated: !!entry.compensated,
+          trackLabel: game.i18n.localize(`ACKS-HENCHMEN.ledger.track.${track}`),
+          delta: delta > 0 ? `+${delta}` : String(delta),
+          reasonLabel: game.i18n.has(reasonKey(track, entry.reason))
+            ? game.i18n.localize(reasonKey(track, entry.reason))
+            : entry.reason ?? "",
+          note: entry.note ?? "",
+        };
+      })
+      .reverse()
+  );
+}
 
 export class RosterApp extends HandlebarsApplicationMixin(ApplicationV2) {
   constructor({ employer, ...options } = {}) {
@@ -45,6 +73,8 @@ export class RosterApp extends HandlebarsApplicationMixin(ApplicationV2) {
       loyaltyRoll: RosterApp.#onLoyaltyRoll,
       obedienceRoll: RosterApp.#onObedienceRoll,
       calamity: RosterApp.#onCalamity,
+      penalty: RosterApp.#onPenalty,
+      toggleCompensated: RosterApp.#onToggleCompensated,
       payWages: RosterApp.#onPayWages,
       openActor: RosterApp.#onOpenActor,
       transfer: RosterApp.#onTransfer,
@@ -117,7 +147,9 @@ export class RosterApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // Never derive months from the epoch: an unenrolled pre-existing
         // henchman owes nothing until the wage engine adopts them.
         const monthsDue = lastPaid == null ? 0 : Math.floor((currentTime - lastPaid) / secondsPerMonth());
-        const permanents = (record.loyalty?.permanents ?? []).reduce((s, p) => s + Number(p.delta ?? 0), 0);
+        // Only the entries that still score: a compensated penalty stays in
+        // the ledger below but is out of the breakdown, like the score itself.
+        const permanents = sumPermanents(record.loyalty?.permanents ?? []);
         return {
           id: actor.id,
           uuid: actor.uuid,
@@ -141,6 +173,7 @@ export class RosterApp extends HandlebarsApplicationMixin(ApplicationV2) {
           calamities: record.counters?.calamities ?? 0,
           noSlot: record.special?.noSlot ?? false,
           origin: record.origin ? game.i18n.localize(`ACKS-HENCHMEN.origin.${record.origin}`) : "",
+          ledger: ledgerRows(record),
           rolled: record.rolled ?? {},
           rolledLine: [
             record.rolled?.classKey,
@@ -192,6 +225,47 @@ export class RosterApp extends HandlebarsApplicationMixin(ApplicationV2) {
       ok: { callback: (_e, button) => button.form.elements.note.value },
     }).catch(() => null);
     if (note !== null) await recordCalamity(actor, note);
+    this.render();
+  }
+
+  /**
+   * Record one of the RR 166 penalties that last only while uncompensated —
+   * a permanent wound (critical/grievous/mortal) or a tampering-with-mortality
+   * side effect. It lands in the loyalty ledger under reason "wound"/
+   * "tampering"; the Judge lifts it later with the compensate toggle rather
+   * than deleting anything.
+   */
+  static async #onPenalty(_event, target) {
+    const actor = this.#actor(target);
+    if (!actor) return;
+    const options = Object.entries(WOUND_PENALTIES)
+      .map(([key, delta]) => `<option value="${key}">${game.i18n.localize(`ACKS-HENCHMEN.penalty.${key}`)} (${delta})</option>`)
+      .join("");
+    const key = await foundry.applications.api.DialogV2.prompt({
+      window: { title: game.i18n.format("ACKS-HENCHMEN.roster.penaltyTitle", { name: actor.name }) },
+      content: `<p class="hint">${game.i18n.localize("ACKS-HENCHMEN.roster.penaltyHint")}</p><select name="key">${options}</select>`,
+      ok: { callback: (_e, button) => button.form.elements.key.value },
+    }).catch(() => null);
+    if (!key || !(key in WOUND_PENALTIES)) return;
+    await addLoyaltyPermanent(
+      actor,
+      WOUND_PENALTIES[key],
+      penaltyReason(key),
+      game.i18n.localize(`ACKS-HENCHMEN.penalty.${key}`)
+    );
+    this.render();
+  }
+
+  /** Suspend or restore one ledger entry (RR 166 "while uncompensated"). */
+  static async #onToggleCompensated(_event, target) {
+    const actor = this.#actor(target);
+    if (!actor) return;
+    const { track, index, compensated } = target.dataset;
+    await setPermanentCompensated(actor, {
+      track,
+      index: Number(index),
+      compensated: compensated !== "true",
+    });
     this.render();
   }
 

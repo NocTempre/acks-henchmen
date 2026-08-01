@@ -67,6 +67,13 @@ export const LOYALTY_REASONS = Object.freeze({
   other: "ACKS-HENCHMEN.loyaltyReason.other",
 });
 
+/** Reasons for permanent MORALE adjustments (RR 166). */
+export const MORALE_REASONS = Object.freeze({
+  firstLevel: "ACKS-HENCHMEN.moraleReason.firstLevel",
+  fifthLevel: "ACKS-HENCHMEN.moraleReason.fifthLevel",
+  other: "ACKS-HENCHMEN.moraleReason.other",
+});
+
 /** Event types in a hireling's record log. */
 export const EVENT_TYPES = Object.freeze({
   hired: "ACKS-HENCHMEN.event.hired",

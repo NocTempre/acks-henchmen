@@ -350,9 +350,11 @@ acksHenchmen.openThrowDialog("hirelingObedience", {
       `// Repair for worlds hit by the epoch-billing bug (pre-existing henchmen
 // invoiced for every month since worldTime zero and hit with calamities when
 // the bill bounced), or for a Judge simply writing off back wages: zeroes
-// wage arrears, removes the loyalty penalties recorded for MISSED WAGES
-// (other calamities are untouched), fixes the calamity counters, and
-// re-derives effective loyalty. Groups get their arrears zeroed too.
+// wage arrears, marks the loyalty penalties recorded for MISSED WAGES
+// compensated so they stop counting — they stay in the roster ledger and can
+// be restored from there (other calamities are untouched), fixes the calamity
+// counters, and re-derives effective loyalty. Groups get their arrears zeroed
+// too. Running it twice changes nothing the second time.
 if (!game.user.isGM) return ui.notifications.warn("Only a GM can forgive wage debts.");
 const selected = canvas.tokens.controlled.map((t) => t.actor).filter(Boolean);
 const employers = selected.length ? selected : acksHenchmen.allEmployers();
@@ -361,7 +363,7 @@ const names = employers.map((e) => e.name).join(", ");
 const ok = await foundry.applications.api.DialogV2.confirm({
   window: { title: "Forgive wage arrears?" },
   content: \`<p>Forgive all recorded wage arrears and missed-wage loyalty penalties for the hirelings and units of: <b>\${names}</b>?</p>
-    <p class="notes">Select employer tokens first to limit the sweep; with nothing selected it covers every employer in the world. Unit morale drops are left for you to judge.</p>\`,
+    <p class="notes">Select employer tokens first to limit the sweep; with nothing selected it covers every employer in the world. Nothing is deleted — the forgiven penalties are marked compensated in each hireling's roster ledger, where you can restore them. Unit morale drops are left for you to judge.</p>\`,
   rejectClose: false,
 });
 if (!ok) return;

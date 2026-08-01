@@ -41,6 +41,7 @@
           <a data-action="loyaltyRoll" data-tooltip="{{localize 'ACKS-HENCHMEN.throw.hirelingLoyalty'}}"><i class="fas fa-user-secret"></i></a>
           <a data-action="obedienceRoll" data-tooltip="{{localize 'ACKS-HENCHMEN.throw.hirelingObedience'}}"><i class="fas fa-list-check"></i></a>
           <a data-action="calamity" data-tooltip="{{localize 'ACKS-HENCHMEN.roster.recordCalamity'}}"><i class="fas fa-skull"></i></a>
+          <a data-action="penalty" data-tooltip="{{localize 'ACKS-HENCHMEN.roster.recordPenalty'}}"><i class="fas fa-bandage"></i></a>
           <a data-action="transfer" data-tooltip="{{localize 'ACKS-HENCHMEN.roster.transfer'}}"><i class="fas fa-right-left"></i></a>
           <a data-action="dismiss" data-tooltip="{{localize 'ACKS-HENCHMEN.roster.dismiss'}}"><i class="fas fa-door-open"></i></a>
         </span>
@@ -50,6 +51,31 @@
         {{#if origin}}<p class="hint">{{origin}}{{#if arrears}} — {{localize "ACKS-HENCHMEN.roster.arrears"}}: {{arrears}} gp{{/if}} — {{localize "ACKS-HENCHMEN.roster.calamities"}}: {{calamities}}</p>{{/if}}
         {{#if rolledLine}}
         <p><strong>{{localize "ACKS-HENCHMEN.roster.rolled"}}:</strong> {{rolledLine}}</p>
+        {{/if}}
+        {{#if ledger.length}}
+        <table class="loyalty-ledger">
+          <caption>{{localize "ACKS-HENCHMEN.ledger.title"}}</caption>
+          <tbody>
+            {{#each ledger}}
+            <tr class="{{#if compensated}}compensated{{/if}}">
+              <td class="ledger-track">{{trackLabel}}</td>
+              <td class="ledger-delta">{{delta}}</td>
+              <td>{{reasonLabel}}</td>
+              <td class="hint">{{note}}</td>
+              <td class="ledger-toggle">
+                {{#if @root.isGM}}
+                <a data-action="toggleCompensated" data-track="{{track}}" data-index="{{index}}" data-compensated="{{compensated}}"
+                   data-tooltip="{{#if compensated}}{{localize 'ACKS-HENCHMEN.ledger.restoreHint'}}{{else}}{{localize 'ACKS-HENCHMEN.ledger.compensateHint'}}{{/if}}">
+                  <i class="fas {{#if compensated}}fa-rotate-left{{else}}fa-hand-holding-heart{{/if}}"></i>
+                </a>
+                {{else if compensated}}
+                <i class="fas fa-check" data-tooltip="{{localize 'ACKS-HENCHMEN.ledger.compensatedTag'}}"></i>
+                {{/if}}
+              </td>
+            </tr>
+            {{/each}}
+          </tbody>
+        </table>
         {{/if}}
         {{#if events.length}}
         <table class="event-log">

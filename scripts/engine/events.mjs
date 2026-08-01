@@ -15,7 +15,7 @@
  */
 import { MODULE_ID, HOOKS, FLAG_RECORD } from "../constants.mjs";
 import HenchmanRecord from "../data/henchman-record.mjs";
-import { effectiveLoyalty, effectiveMorale, loyaltyDeltaForOutcome, outcomeLeavesService, clampScore } from "../rules/loyalty.mjs";
+import { effectiveLoyalty, effectiveMorale, loyaltyDeltaForOutcome, outcomeLeavesService, clampScore, reasonKey } from "../rules/loyalty.mjs";
 import { henchmanWage, mercenaryWage } from "../rules/wages.mjs";
 import { FLAG_GROUP_PAY } from "./hire-group.mjs";
 import { collectEffectModifiers, sumEffectModifiers, toDialogModifiers, hasEffectFlag } from "../effects.mjs";
@@ -65,6 +65,44 @@ export async function addLoyaltyPermanent(actor, delta, reason, note = "") {
   });
   await syncLoyalty(actor);
   Hooks.callAll(HOOKS.LOYALTY_EVENT, { actor, delta, reason, note });
+}
+
+/**
+ * Suspend or restore one ledger entry (RR 166: a wound or tampering penalty
+ * applies only "while uncompensated"). The entry STAYS in the ledger — it
+ * simply stops counting toward the effective score — so the history remains
+ * readable and the Judge can undo the ruling. Always a GM decision: nothing
+ * in the module compensates an entry on its own.
+ * @param {Actor} actor
+ * @param {object} opts
+ * @param {"loyalty"|"morale"} [opts.track="loyalty"] - which ledger
+ * @param {number} opts.index - position in that ledger's `permanents`
+ * @param {boolean} [opts.compensated=true]
+ * @returns {Promise<boolean>} whether anything changed
+ */
+export async function setPermanentCompensated(actor, { track = "loyalty", index, compensated = true } = {}) {
+  if (track !== "loyalty" && track !== "morale") return false;
+  const record = actor.getFlag(MODULE_ID, FLAG_RECORD) ?? {};
+  const permanents = [...(record[track]?.permanents ?? [])];
+  const entry = permanents[index];
+  if (!entry || !!entry.compensated === !!compensated) return false;
+  permanents[index] = { ...entry, compensated: !!compensated };
+  await actor.setFlag(MODULE_ID, FLAG_RECORD, {
+    ...record,
+    [track]: { ...(record[track] ?? {}), permanents },
+  });
+  if (track === "loyalty") await syncLoyalty(actor);
+  await HenchmanRecord.logEvent(actor, {
+    type: "adjustment",
+    note: game.i18n.format(compensated ? "ACKS-HENCHMEN.ledger.compensatedNote" : "ACKS-HENCHMEN.ledger.restoredNote", {
+      delta: entry.delta > 0 ? `+${entry.delta}` : String(entry.delta ?? 0),
+      reason: game.i18n.has(reasonKey(track, entry.reason))
+        ? game.i18n.localize(reasonKey(track, entry.reason))
+        : entry.reason || "",
+    }),
+  });
+  Hooks.callAll(HOOKS.LOYALTY_EVENT, { actor, delta: entry.delta, reason: entry.reason, compensated: !!compensated });
+  return true;
 }
 
 /* ------------------------- loyalty / obedience rolls ------------------------- */
@@ -365,12 +403,14 @@ export function allEmployers() {
 /**
  * Repair: forgive the wage debts the module recorded — for worlds where the
  * epoch-billing bug (or plain fiction) left absurd arrears and unearned
- * calamities. Per hireling of `employer`: zero `terms.arrearsGp`, remove the
+ * calamities. Per hireling of `employer`: zero `terms.arrearsGp`, mark the
  * loyalty permanents recorded for missed wages (reason "calamity", the
- * missed-wages note), decrement the calamity counter by those removed, and
- * re-derive effective loyalty. Groups get their arrears zeroed (their morale
- * drop is left to the GM — it may have been earned since). Other calamities
- * (wounds, deaths) are untouched.
+ * missed-wages note) COMPENSATED so they stop scoring — the entries stay in
+ * the ledger, visible and reversible from the roster, rather than being
+ * deleted — decrement the calamity counter by those forgiven, and re-derive
+ * effective loyalty. Groups get their arrears zeroed (their morale drop is
+ * left to the GM — it may have been earned since). Other calamities (wounds,
+ * deaths) are untouched, and re-running the repair is a no-op.
  */
 export async function forgiveWageDebts(employer) {
   const wageNote = game.i18n.localize("ACKS-HENCHMEN.wage.missedCalamity");
@@ -381,24 +421,25 @@ export async function forgiveWageDebts(employer) {
     if (!actor) continue;
     const record = actor.getFlag(MODULE_ID, FLAG_RECORD) ?? {};
     const permanents = record.loyalty?.permanents ?? [];
-    const kept = permanents.filter((p) => !(p.reason === "calamity" && p.note === wageNote));
-    const removed = permanents.length - kept.length;
+    const isWagePenalty = (p) => p.reason === "calamity" && p.note === wageNote && !p.compensated;
+    const forgiven = permanents.filter(isWagePenalty).length;
+    const kept = permanents.map((p) => (isWagePenalty(p) ? { ...p, compensated: true } : p));
     const arrears = Number(record.terms?.arrearsGp ?? 0);
-    if (!removed && !arrears) continue;
+    if (!forgiven && !arrears) continue;
     await actor.setFlag(MODULE_ID, FLAG_RECORD, {
       ...record,
       terms: { ...(record.terms ?? {}), arrearsGp: 0 },
       loyalty: { ...(record.loyalty ?? {}), permanents: kept },
       counters: {
         ...(record.counters ?? {}),
-        calamities: Math.max(0, Number(record.counters?.calamities ?? 0) - removed),
+        calamities: Math.max(0, Number(record.counters?.calamities ?? 0) - forgiven),
       },
     });
     await syncLoyalty(actor);
     await HenchmanRecord.logEvent(actor, { type: "wagesForgiven", note: arrears ? `${arrears} gp` : "" });
     summary.hirelings++;
     summary.arrearsGp += arrears;
-    summary.calamities += removed;
+    summary.calamities += forgiven;
   }
   for (const group of game.actors.filter((a) => a.type === GROUP_TYPE && a.system?.unit?.employerUuid === employer.uuid)) {
     const pay = group.getFlag(MODULE_ID, FLAG_GROUP_PAY) ?? {};
