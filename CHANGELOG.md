@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.30.0
+
+- **Adopt the single-publisher token contract (requires acks-lib 0.40.0).**
+  Literal `var(--acks-*, #hex)` fallbacks are stripped — they mask a missing
+  token instead of failing it, and acks-lib now guarantees the tokens load.
+  The hirelings-grid group headings take the INK-role `--acks-spot` instead of
+  the SURFACE `--acks-burgundy`: the surface token stays dark on dark seats,
+  where the headings measured 1.5:1 — invisible. One-off state hexes ride the
+  audited pairs instead: roster over-limit `--acks-danger(-ink)`, wage-due
+  `--acks-warning(-ink)`, directed-search star `--acks-gold`.
+- Throw/posting dialog bodies and the roster ride the family type scale
+  (`--acks-fs-body`), so acks-lib's new fontScale knob resizes them; the
+  location sheet already follows via `.acks-ui`.
+
 ## 0.29.1
 
 - **The compensate toggle is now GM-only in the engine, not just the UI.**

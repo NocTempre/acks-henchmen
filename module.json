@@ -2,7 +2,7 @@
   "id": "acks-henchmen",
   "title": "ACKS II — Henchmen & Hirelings",
   "description": "Completes the ACKS II hireling ruleset: market-class availability rolling, recruitment postings with time tracking, a player-facing recruitment board, hiring negotiation (Reaction to Hiring Offer), henchman stat/class/level rolling with recorded results, loyalty & morale automation (calamities, level-up loyalty rolls, obedience, wages), monstrous henchmen, followers, and optional slavery rules. Modifiers are data-driven: Active Effects on proficiency/power items feed every roll.",
-  "version": "0.29.1",
+  "version": "0.30.0",
   "socket": true,
   "compatibility": {
     "minimum": "14",
@@ -75,7 +75,7 @@
         "type": "module",
         "reason": "rules-table registry (acksLib.tables) for market/wage/hiring tables; acksLib.groups (the acks-lib.group stackable actor) to hire a whole unit from the market as one group — troops as stacks with RR 166 base morale + cavalry weight, officer as linked commander with RR 169 command capacity + RR 171 morale modifier; and acksLib.followerCard (the printed Follower Card renderer) to re-skin the character sheet's hirelings tab as a card grid",
         "compatibility": {
-          "minimum": "0.28.0"
+          "minimum": "0.40.0"
         }
       }
     ]
