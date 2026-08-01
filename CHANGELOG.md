@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.28.0
+
+- **Wage cards never say NaN again.** The due card totalled a key the
+  computation never wrote; it now sums the same per-hireling amounts Pay
+  charges, over the same list (paid groups included).
+- **Pre-existing henchmen are adopted, not billed from the epoch.** A
+  hireling with no wage history owes nothing for the months before the
+  module arrived: their clock starts the day the module first sees them
+  (ready sweep + ahead of every due computation), origin *Pre-existing*.
+  Previously they were invoiced for every month since worldTime zero —
+  six-figure demands and unearned calamities.
+- **Insufficient funds stops the payday** — no arrears, no calamity, records
+  untouched. *Mark missed* remains an explicit GM decision.
+- **Forgive Wage Arrears (Repair)** macro + `api.forgiveWageDebts`: zeroes
+  recorded arrears, reverses missed-wage loyalty penalties and calamity
+  counters (other calamities untouched), re-derives effective loyalty.
+- **Roster: Cards for all / Full sheets for all** — bulk sheet toggles for
+  the whole retinue, built on acks-lib's `followerCard.setSheet`.
+
 ## 0.27.1
 
 - **Fixed: the hirelings-tab cards did not match the hireling’s own sheet.** Core’s
