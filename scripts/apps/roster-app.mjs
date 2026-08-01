@@ -49,8 +49,31 @@ export class RosterApp extends HandlebarsApplicationMixin(ApplicationV2) {
       openActor: RosterApp.#onOpenActor,
       transfer: RosterApp.#onTransfer,
       dismiss: RosterApp.#onDismiss,
+      allCards: RosterApp.#onAllSheets(true),
+      allFull: RosterApp.#onAllSheets(false),
     },
   };
+
+  /**
+   * Bulk face-flip for the whole retinue, through acks-lib's one sanctioned
+   * switch (followerCard.setSheet — the same flag core's Sheet Config writes).
+   * Returns a bound handler so both buttons share one implementation.
+   */
+  static #onAllSheets(useCard) {
+    return async function () {
+      const setSheet = globalThis.acksLib?.followerCard?.setSheet;
+      if (!setSheet) return ui.notifications.warn(game.i18n.localize("ACKS-HENCHMEN.libMissing"));
+      const ids = [...adapter.getHenchmenIds(this.employer), ...(this.employer.getFlag(MODULE_ID, FLAG_MONSTER_LIST) ?? [])];
+      let changed = 0;
+      for (const id of ids) {
+        const actor = game.actors.get(id);
+        if (actor && (await setSheet(actor, useCard))) changed++;
+      }
+      ui.notifications.info(
+        game.i18n.format(useCard ? "ACKS-HENCHMEN.roster.allCardsDone" : "ACKS-HENCHMEN.roster.allFullDone", { count: changed }),
+      );
+    };
+  }
 
   static PARTS = {
     body: { template: `modules/${MODULE_ID}/templates/roster-app.hbs` },

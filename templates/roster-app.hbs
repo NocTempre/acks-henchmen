@@ -15,6 +15,14 @@
       </button>
       {{/if}}
     </div>
+    <div class="sheet-toggle">
+      <button type="button" data-action="allCards" data-tooltip="{{localize 'ACKS-HENCHMEN.roster.allCardsHint'}}">
+        <i class="fa-solid fa-address-card"></i> {{localize "ACKS-HENCHMEN.roster.allCards"}}
+      </button>
+      <button type="button" data-action="allFull" data-tooltip="{{localize 'ACKS-HENCHMEN.roster.allFullHint'}}">
+        <i class="fa-solid fa-file-lines"></i> {{localize "ACKS-HENCHMEN.roster.allFull"}}
+      </button>
+    </div>
   </header>
 
   {{#if rows.length}}
